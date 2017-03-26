@@ -59,9 +59,8 @@ void socket_init(socket_ctx *ctx, char *path) {
 		}
 	}
 
-	int ret = listen(ctx->fd, 5);
-	if (ret == -1) {
-		perror("listen");
+	if (listen(ctx->fd, 5)) {
+		perror("unable to listen on unix-socket");
 		exit(EXIT_FAILURE);
 	}
 }
