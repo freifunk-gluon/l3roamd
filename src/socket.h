@@ -10,7 +10,6 @@
 typedef struct {
 	struct l3ctx *l3ctx;
 	int fd;
-	struct sockaddr_un socket;
 } socket_ctx;
 
 void socket_init(socket_ctx *ctx, char *path);

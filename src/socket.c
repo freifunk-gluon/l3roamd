@@ -30,12 +30,12 @@
 #include "error.h"
 
 void socket_init(socket_ctx *ctx, char *path) {
-	if (! path) {
+	if (!path) {
 		ctx->fd = -1;
 		return;
 	}
 
-	printf("initialize socket\n");
+	printf("initialize unix socket on path %s\n", path);
 
 	unlink(path);
 
@@ -50,8 +50,6 @@ void socket_init(socket_ctx *ctx, char *path) {
 
 	ctx->fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
-
-	int ret = bind(ctx->fd, (struct sockaddr *)&ctx->socket, sizeof(ctx->socket));
 	if (bind(ctx->fd, (struct sockaddr *)sa, len)) {
 		switch (errno) {
 			case EADDRINUSE:
@@ -61,7 +59,7 @@ void socket_init(socket_ctx *ctx, char *path) {
 		}
 	}
 
-	ret = listen(ctx->fd, 5);
+	int ret = listen(ctx->fd, 5);
 	if (ret == -1) {
 		perror("listen");
 		exit(EXIT_FAILURE);

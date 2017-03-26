@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 				ctx.clientmgr_ctx.export_table = atoi(optarg);
 				break;
 			case 's':
-				socketpath=optarg;
+				socketpath = optarg;
 				break;
 			case '4':
 				if (!parse_prefix(&ctx.clientmgr_ctx.v4prefix, optarg))
