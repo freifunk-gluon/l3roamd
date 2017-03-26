@@ -32,6 +32,7 @@
 #include "routemgr.h"
 #include "intercom.h"
 #include "config.h"
+#include "socket.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 void add_fd(int efd, int fd, uint32_t events) {
 	struct epoll_event event = {};
@@ -71,6 +73,11 @@ void loop(struct l3ctx *ctx) {
 	add_fd(efd, ctx->icmp6_ctx.nsfd, EPOLLIN);
 	add_fd(efd, ctx->arp_ctx.fd, EPOLLIN);
 	add_fd(efd, ctx->intercom_ctx.fd, EPOLLIN | EPOLLET);
+
+	if (ctx->socket_ctx.fd >= 0) {
+		add_fd(efd, ctx->socket_ctx.fd, EPOLLIN);
+	}
+
 	if (ctx->wifistations_ctx.fd >= 0) {
 		add_fd(efd, ctx->wifistations_ctx.fd, EPOLLIN);
 	}
@@ -107,6 +114,8 @@ void loop(struct l3ctx *ctx) {
 					intercom_handle_in(&ctx->intercom_ctx, events[i].data.fd);
 			} else if (ctx->taskqueue_ctx.fd == events[i].data.fd) {
 				taskqueue_run(&ctx->taskqueue_ctx);
+			} else if (ctx->socket_ctx.fd == events[i].data.fd) {
+				socket_handle_in(&ctx->socket_ctx, VECTOR_LEN(ctx->clientmgr_ctx.clients));
 			} else if (ctx->wifistations_ctx.fd == events[i].data.fd) {
 				wifistations_handle_in(&ctx->wifistations_ctx);
 			}
@@ -121,6 +130,7 @@ void usage() {
 	puts("  -a <ip6>          ip address of this node");
 	puts("  -c <file>         configuration file");
 	puts("  -p <prefix>       clientprefix"); // TODO mehrfache angabe sollte möglich sein
+	puts("  -s <socketpath>   provide statistics on this socket");
 	puts("  -i <clientif>     client interface");
 	puts("  -m <meshif>       mesh interface. may be specified multiple times");
 	puts("  -t <export table> export routes to this table");
@@ -164,6 +174,9 @@ void interfaces_changed(struct l3ctx *ctx, int type, const struct ifinfomsg *msg
 
 int main(int argc, char *argv[]) {
 	struct l3ctx ctx = {};
+	char *socketpath = NULL;
+
+	signal(SIGPIPE, SIG_IGN);
 
 	ctx.taskqueue_ctx.l3ctx = &ctx;
 	ctx.wifistations_ctx.l3ctx = &ctx;
@@ -173,11 +186,12 @@ int main(int argc, char *argv[]) {
 	ctx.ipmgr_ctx.l3ctx = &ctx;
 	ctx.arp_ctx.l3ctx = &ctx;
 	ctx.routemgr_ctx.l3ctx = &ctx;
+	ctx.socket_ctx.l3ctx = &ctx;
 
 	intercom_init(&ctx.intercom_ctx);
 
 	int c;
-	while ((c = getopt(argc, argv, "ha:p:i:m:t:c:4:n:")) != -1)
+	while ((c = getopt(argc, argv, "ha:p:i:m:t:c:4:n:s:")) != -1)
 		switch (c) {
 			case 'h':
 				usage();
@@ -185,8 +199,7 @@ int main(int argc, char *argv[]) {
 			case 'a':
 				if(inet_pton(AF_INET6, optarg, &ctx.intercom_ctx.ip) != 1)
 					exit_error("Can not parse IP address");
-
-	break;
+				break;
 			case 'c':
 				parse_config(optarg);
 				break;
@@ -206,6 +219,9 @@ int main(int argc, char *argv[]) {
 			case 't':
 				ctx.clientmgr_ctx.export_table = atoi(optarg);
 				break;
+			case 's':
+				socketpath=optarg;
+				break;
 			case '4':
 				if (!parse_prefix(&ctx.clientmgr_ctx.v4prefix, optarg))
 					exit_error("Can not parse IPv4 prefix");
@@ -223,6 +239,7 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr, "Invalid parameter %c ignored.\n", c);
 		}
 
+	socket_init(&ctx.socket_ctx, socketpath);
 	routemgr_init(&ctx.routemgr_ctx);
 	ipmgr_init(&ctx.ipmgr_ctx, "l3roam0", 9000);
 	icmp6_init(&ctx.icmp6_ctx);

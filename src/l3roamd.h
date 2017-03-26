@@ -9,6 +9,7 @@
 #include "ipmgr.h"
 #include "arp.h"
 #include "routemgr.h"
+#include "socket.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,6 +27,7 @@ struct l3ctx {
 	ipmgr_ctx ipmgr_ctx;
 	arp_ctx arp_ctx;
 	routemgr_ctx routemgr_ctx;
+	socket_ctx socket_ctx;
 };
 
 void interfaces_changed(struct l3ctx *ctx, int type, const struct ifinfomsg *msg);
