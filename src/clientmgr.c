@@ -49,6 +49,7 @@ struct in6_addr node_client_ip_from_mac(uint8_t mac[6]) {
 
 	return address;
 }
+
 bool prefix_contains(const struct prefix *prefix, struct in6_addr *addr) {
 	int mask=0xff;
 	for (int remaining_plen = prefix->plen, i=0;remaining_plen > 0; remaining_plen-= 8) {
