@@ -204,7 +204,7 @@ void intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet) {
 	intercom_packet_info_entry *entry = (intercom_packet_info_entry*)((uint8_t*)(packet) + sizeof(intercom_packet_info));
 
 	for (int i = 0; i < packet->num_addresses; i++) {
-		memcpy(&ip.address.s6_addr, &entry->address, sizeof(uint8_t) * 16);
+		memcpy(&ip.addr.s6_addr, &entry->address, sizeof(uint8_t) * 16);
 		VECTOR_ADD(client.addresses, ip);
 		entry++;
 	}
@@ -284,7 +284,7 @@ void intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct c
 
 	for (i = 0; i < VECTOR_LEN(client->addresses) && i < INFO_MAX; i++) {
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
-		memcpy(&entry->address, ip->address.s6_addr, sizeof(uint8_t) * 16);
+		memcpy(&entry->address, ip->addr.s6_addr, sizeof(uint8_t) * 16);
 		entry++;
 	}
 

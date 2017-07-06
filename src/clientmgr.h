@@ -17,13 +17,13 @@ enum ip_state {
 
 struct prefix {
 	struct in6_addr prefix;
-	int plen;
+	int plen; /* in bits */
 };
 
 struct client_ip {
 	enum ip_state state;
-	int tentative_cnt;
-	struct in6_addr address;
+	int tentative_retries_left;
+	struct in6_addr addr;
 	struct timespec timestamp;
 };
 
@@ -48,9 +48,8 @@ struct client_task {
 	uint8_t mac[6];
 };
 
-void mac_addr_n2a(char *mac_addr, unsigned char *arg);
-bool clientmgr_valid_address(clientmgr_ctx *ctx, struct in6_addr *address);
-bool clientmgr_is_ipv4(clientmgr_ctx *ctx, struct in6_addr *address);
+bool clientmgr_valid_address(clientmgr_ctx *ctx, struct in6_addr *ip);
+bool clientmgr_is_ipv4(clientmgr_ctx *ctx, struct in6_addr *ip);
 void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t *mac, unsigned int ifindex);
 void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex);
 void clientmgr_handle_claim(clientmgr_ctx *ctx, const struct in6_addr *sender, uint8_t mac[6]);
