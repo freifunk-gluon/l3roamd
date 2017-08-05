@@ -361,9 +361,9 @@ void checkclient(clientmgr_ctx *ctx, uint8_t mac[6]) {
 
 		switch (ip->state) {
 			case IP_ACTIVE:
-				if (timespec_cmp(ip->timestamp, na_timeout) <= 0)
-					client_ip_set_state(ctx, client, ip, IP_INACTIVE);
-
+				if (timespec_cmp(ip->timestamp, na_timeout) <= 0) {
+					client_ip_set_state(ctx, client, ip, IP_TENTATIVE);
+				}
 				if (clientmgr_is_ipv4(ctx, &ip->address))
 					arp_send_request(CTX(arp), &ip->address);
 				else
@@ -395,8 +395,7 @@ void checkclient(clientmgr_ctx *ctx, uint8_t mac[6]) {
 		return;
 	}
 
-	// TODO schedule at earliest IP timeout
-	schedule_clientcheck(ctx, client, IP_CHECKCLIENT_TIMEOUT);
+	schedule_clientcheck(ctx, client, IP_CHECKCLIENT_INTERVAL);
 }
 
 /** Check whether an IP address is contained in a client prefix.
@@ -450,7 +449,7 @@ void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t
 	if (ip_is_new)
 		intercom_info(CTX(intercom), NULL, client, false);
 
-	schedule_clientcheck(ctx, client, IP_CHECKCLIENT_TIMEOUT);
+	schedule_clientcheck(ctx, client, IP_CHECKCLIENT_INTERVAL);
 }
 
 /** Notify the client manager about a new MAC (e.g. a new wifi client).
