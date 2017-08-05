@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <time.h>
 
-#define IP_CHECKCLIENT_TIMEOUT 5
+#define IP_CHECKCLIENT_INTERVAL 4
 #define NA_TIMEOUT 10
 #define CLIENT_TIMEOUT 300
 #define TENTATIVE_TRIES 5
