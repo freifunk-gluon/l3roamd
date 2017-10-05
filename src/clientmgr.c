@@ -34,7 +34,7 @@ void mac_addr_n2a(char *mac_addr, unsigned char *arg) {
 //	snprintf(&addr_str[0], INET6_ADDRSTRLEN, "ff02::1:ff%02x:%02x%02x", mac[3], mac[4], mac[5]);
 //}
 
-struct in6_addr node_client_ip_from_mac(uint8_t mac[6]) {
+struct in6_addr mac2ipv6(uint8_t mac[6]) {
 	struct in6_addr address = {};
 	inet_pton(AF_INET6, NODE_CLIENT_PREFIX, &address);
 
@@ -112,10 +112,6 @@ bool client_is_active(const struct client *client) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	if (timespec_cmp(client->active_until, now) > 0)
-		return true;
-
-	// TODO: how redundant ist client->active_until and the IP->state IP_ACTIVE?
 	for (int i = 0; i < VECTOR_LEN(client->addresses); i++) {
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
 
@@ -253,7 +249,7 @@ void clientmgr_delete_client(clientmgr_ctx *ctx, const uint8_t mac[6]) {
 					struct client_ip *e = &VECTOR_INDEX(client->addresses, i);
 					client_ip_set_state(CTX(clientmgr), client, e, IP_INACTIVE);
 					char str[INET6_ADDRSTRLEN];
-					inet_ntop(AF_INET6, &e->address, str, INET6_ADDRSTRLEN);
+					inet_ntop(AF_INET6, &e->addr, str, INET6_ADDRSTRLEN);
 				}
 			}
 
@@ -279,7 +275,7 @@ const char *state_str(enum ip_state state) {
 /** Change state of an IP address. Trigger all side effects like resetting
     counters, timestamps and route changes.
   */
-void client_ipaddress_set_state(clientmgr_ctx *ctx, struct client *client, struct client_ip *ip, enum ip_state state) {
+void client_ip_set_state(clientmgr_ctx *ctx, struct client *client, struct client_ip *ip, enum ip_state state) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
@@ -376,7 +372,7 @@ void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t
 
 	client->ifindex = ifindex;
 
-	client_ipaddress_set_state(ctx, client, ip, IP_ACTIVE);
+	client_ip_set_state(ctx, client, ip, IP_ACTIVE);
 
 	if (!was_active) {
 		if (!intercom_claim(CTX(intercom), NULL, client))
@@ -400,8 +396,6 @@ void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	client->active_until = now;
-	client->active_until.tv_sec += CLIENT_TIMEOUT;
 	client->ifindex = ifindex;
 
 	if (!intercom_claim(CTX(intercom), NULL, client)) {
@@ -413,10 +407,10 @@ void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
 
 		if (ip->state == IP_TENTATIVE || ip->state == IP_INACTIVE)
-			client_ipaddress_set_state(ctx, client, ip, IP_TENTATIVE);
+			client_ip_set_state(ctx, client, ip, IP_TENTATIVE);
 	}
 
-	struct in6_addr address = node_client_ip_from_mac(client->mac);
+	struct in6_addr address = mac2ipv6(client->mac);
 	icmp6_send_solicitation(CTX(icmp6), &address);
 }
 
@@ -444,7 +438,7 @@ void clientmgr_handle_claim(clientmgr_ctx *ctx, const struct in6_addr *sender, u
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
 
 		if (ip->state == IP_ACTIVE || ip->state == IP_TENTATIVE)
-			client_ipaddress_set_state(ctx, client, ip, IP_TENTATIVE);
+			client_ip_set_state(ctx, client, ip, IP_TENTATIVE);
 	}
 
 }
@@ -468,7 +462,7 @@ void clientmgr_handle_info(clientmgr_ctx *ctx, struct client *foreign_client, bo
 		VECTOR_ADD(client->addresses, *foreign_ip);
 		ip = &VECTOR_INDEX(client->addresses, VECTOR_LEN(client->addresses) - 1);
 
-		client_ipaddress_set_state(ctx, client, ip, IP_TENTATIVE);
+		client_ip_set_state(ctx, client, ip, IP_TENTATIVE);
 	}
 
 	if (relinquished)
