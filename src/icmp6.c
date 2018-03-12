@@ -1,13 +1,13 @@
 #include "icmp6.h"
 #include "l3roamd.h"
 #include "util.h"
-#include "clientmgr.h"
 
 #include <linux/in6.h>
 #include <stddef.h>
 #include <sys/ioctl.h>
 #include <string.h>
 #include <error.h>
+#include <stdio.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <linux/if_packet.h>

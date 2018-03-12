@@ -42,6 +42,8 @@ typedef struct {
 	struct prefix node_client_prefix;
 	client_vector clients;
 	client_vector oldclients;
+	struct in_addr start;
+	struct in_addr end;
 } clientmgr_ctx;
 
 struct client_task {
