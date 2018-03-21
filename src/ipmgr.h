@@ -30,7 +30,6 @@
 
 #include <stdint.h>
 #include <netinet/in.h>
-#include "intercom.h"
 #define PACKET_TIMEOUT 5  // drop packet after it sat in the unknown destination-queue for this amount of time
 #define SEEK_INTERVAL 3    // retry a seek every n seconds
 
