@@ -311,6 +311,22 @@ void icmp6_send_dest_unreachable(const struct in6_addr *addr, const struct packe
 	}
 }
 
+
+struct in6_addr mac2ipv6(uint8_t mac[6], struct prefix *prefix) {
+	struct in6_addr address = prefix->prefix;
+
+	address.s6_addr[8] = mac[0] ^ 0x02;
+	address.s6_addr[9] = mac[1];
+	address.s6_addr[10] = mac[2];
+	address.s6_addr[11] = 0xff;
+	address.s6_addr[12] = 0xfe;
+	address.s6_addr[13] = mac[3];
+	address.s6_addr[14] = mac[4];
+	address.s6_addr[15] = mac[5];
+
+	return address;
+}
+
 void icmp6_send_solicitation(icmp6_ctx *ctx, const struct in6_addr *addr) {
 	if (!strlen(ctx->clientif))
 		return;

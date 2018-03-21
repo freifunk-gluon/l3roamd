@@ -63,33 +63,65 @@ void mac_addr_n2a(char *mac_addr, unsigned char *arg) {
 //	snprintf(&addr_str[0], INET6_ADDRSTRLEN, "ff02::1:ff%02x:%02x%02x", mac[3], mac[4], mac[5]);
 //}
 
-struct in6_addr mac2specialipv6(uint8_t mac[6]) {
-	struct in6_addr address = l3ctx.clientmgr_ctx.node_client_prefix.prefix;
+int address_allocate(struct in_addr *addrp, unsigned char *mac) {
+	// Find a free address like dnsmasq would. There is no collision checking
+	struct in_addr start, addr;
+	int i, pass;
+	unsigned int j; 
 
-	address.s6_addr[8] = mac[0] ^ 0x02;
-	address.s6_addr[9] = mac[1];
-	address.s6_addr[10] = mac[2];
-	address.s6_addr[11] = 0xff;
-	address.s6_addr[12] = 0xfe;
-	address.s6_addr[13] = mac[3];
-	address.s6_addr[14] = mac[4];
-	address.s6_addr[15] = mac[5];
+	/* hash mac: use the SDBM hashing algorithm.  Seems to give good
+	   dispersal even with similarly-valued "strings". */ 
+	for (j = 0, i = 0; i < 6; i++)
+		j = mac[i] + (j << 6) + (j << 16) - j;
 
-	return address;
+	/* j == 0 is marker */
+	if (j == 0)
+		j = 1;
+
+	for (pass = 0; pass <= 1; pass++) {
+		start.s_addr = htonl(ntohl(l3ctx.clientmgr_ctx.start.s_addr) + ((j) % (1 + ntohl(l3ctx.clientmgr_ctx.end.s_addr) - ntohl(l3ctx.clientmgr_ctx.start.s_addr))));
+
+		/* iterate until we find a free address. */
+		addr = start;
+
+		do {
+			/* Addresses which end in .255 and .0 will not be allocated by dnsmasq*/	    
+			if ((ntohl(addr.s_addr) & 0xff) != 0xff && ((ntohl(addr.s_addr) & 0xff) != 0x0))
+			{
+				// We could check if the address is used already here but would probably get in conflicht with dnsmasq
+				printf("WARNING address ends with 0 or ff\n");
+			}
+
+			// this is unfortunately seemingly broken in dnsmasq. the increment should only happen if the address cannot be used
+			addr.s_addr = htonl(ntohl(addr.s_addr) + 1);
+
+			if (addr.s_addr == htonl(ntohl(l3ctx.clientmgr_ctx.end.s_addr) + 1))
+				addr = l3ctx.clientmgr_ctx.start;
+
+		} while (addr.s_addr != start.s_addr);
+	}
+
+	return 0;
 }
 
-struct in6_addr mac2ipv6(uint8_t mac[6], struct prefix *prefix) {
-	struct in6_addr address = prefix->prefix;
 
-	address.s6_addr[8] = mac[0] ^ 0x02;
-	address.s6_addr[9] = mac[1];
-	address.s6_addr[10] = mac[2];
-	address.s6_addr[11] = 0xff;
-	address.s6_addr[12] = 0xfe;
-	address.s6_addr[13] = mac[3];
-	address.s6_addr[14] = mac[4];
-	address.s6_addr[15] = mac[5];
+struct in6_addr mac2specialipv6(uint8_t mac[6]) {
+	// this should be: CLIENTNODEIPPREFIX/48 + CLIENTMAC + CLIENTIP
+	struct in6_addr address = l3ctx.clientmgr_ctx.node_client_prefix.prefix;
 
+	address.s6_addr[6] = mac[0];
+	address.s6_addr[7] = mac[1];
+	address.s6_addr[8] = mac[2];
+	address.s6_addr[9] = mac[3];
+	address.s6_addr[10] = mac[4];
+	address.s6_addr[11] = mac[5];
+
+/*
+	address.s6_addr[12] = ip[0];
+	address.s6_addr[13] = ip[1];
+	address.s6_addr[14] = ip[2];
+	address.s6_addr[15] = ip[3];
+*/
 	return address;
 }
 
@@ -155,55 +187,12 @@ bool client_is_active(const struct client *client) {
 	return false;
 }
 
-// shamelessly borrowed by dnsmasq
-int address_allocate(struct in_addr *addrp, unsigned char *mac) {
-	// Find a free address like dnsmasq would. There is no collision checking
-	struct in_addr start, addr;
-	int i, pass;
-	unsigned int j; 
-
-	/* hash mac: use the SDBM hashing algorithm.  Seems to give good
-	   dispersal even with similarly-valued "strings". */ 
-	for (j = 0, i = 0; i < 6; i++)
-		j = mac[i] + (j << 6) + (j << 16) - j;
-
-	/* j == 0 is marker */
-	if (j == 0)
-		j = 1;
-
-	for (pass = 0; pass <= 1; pass++) {
-		start.s_addr = htonl(ntohl(l3ctx.clientmgr_ctx.start.s_addr) + ((j) % (1 + ntohl(l3ctx.clientmgr_ctx.end.s_addr) - ntohl(l3ctx.clientmgr_ctx.start.s_addr))));
-
-		/* iterate until we find a free address. */
-		addr = start;
-
-		do {
-			/* Addresses which end in .255 and .0 will not be allocated by dnsmasq*/	    
-			if ((ntohl(addr.s_addr) & 0xff) != 0xff && ((ntohl(addr.s_addr) & 0xff) != 0x0))
-			{
-				// We could check if the address is used already here but would probably get in conflicht with dnsmasq
-				printf("WARNING address ends with 0 or ff\n");
-			}
-
-			// this is unfortunately seemingly broken in dnsmasq. the increment should only happen if the address cannot be used
-			addr.s_addr = htonl(ntohl(addr.s_addr) + 1);
-
-			if (addr.s_addr == htonl(ntohl(l3ctx.clientmgr_ctx.end.s_addr) + 1))
-				addr = l3ctx.clientmgr_ctx.start;
-
-		} while (addr.s_addr != start.s_addr);
-	}
-
-	return 0;
-}
-
 
 /** Adds the special node client IP address.
 */
 void add_special_ip(clientmgr_ctx *ctx, struct client *client) {
 	if (client == NULL) // this can happen if the client was removed before the claim cycle was finished
 		return;
-
 
 	if (client->node_ip_initialized) {
 		char mac_str[18];
