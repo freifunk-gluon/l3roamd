@@ -202,13 +202,6 @@ void loop() {
 			if (l3ctx.debug) {
 				printf("handling event on fd %i. taskqueue.fd: %i routemgr: %i ipmgr: %i icmp6: %i icmp6.ns: %i arp: %i socket: %i, wifistations: %i, intercom_unicast_nodeip_fd: %i - ", events[i].data.fd, l3ctx.taskqueue_ctx.fd, l3ctx.routemgr_ctx.fd, l3ctx.ipmgr_ctx.fd, l3ctx.icmp6_ctx.fd, l3ctx.icmp6_ctx.nsfd, l3ctx.arp_ctx.fd, l3ctx.socket_ctx.fd, l3ctx.wifistations_ctx.fd, l3ctx.intercom_ctx.unicast_nodeip_fd);
 			}
-// TODO: what should we do with EAGAIN and why are we even receiving it ie on
-// routemgr
-// Mon Mar 12 01:02:24 2018 daemon.info l3roamd[6323]: Got packet from 2a06:8187:fbab:1:c66e:1fff:feb6:27da destined to 2a06:8187:fbab:2::2001
-// Mon Mar 12 01:02:24 2018 daemon.info l3roamd[6323]: handling event on fd 8. taskqueue.fd: 10 routemgr: 8 ipmgr: 6 icmp6: 11 icmp6.ns: 13 arp: 14 socket: 5, wifistations: 9, intercom_unicast_nodeip_fd: 4 - epoll error received on fd 8, continuing. taskqueue.fd: 10 routemgr: 8 ipmgr: 6 icmp6: 11 icmp6.ns: 13 arp: 14 socket: 5, wifistations: 9
-//Mon Mar 12 01:02:24 2018 daemon.err l3roamd[6323]: epoll error. Exiting now.: Resource temporarily unavailable
-// Mon Mar 12 01:02:24 2018 daemon.err l3roamd[6323]: Exiting. Removing routes for prefixes and clients.
-
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) ||  (!(events[i].events & EPOLLIN || events[i].events & EPOLLET))) {
 				printf("epoll error received on fd %i, continuing. taskqueue.fd: %i routemgr: %i ipmgr: %i icmp6: %i icmp6.ns: %i arp: %i socket: %i, wifistations: %i\n", events[i].data.fd, l3ctx.taskqueue_ctx.fd, l3ctx.routemgr_ctx.fd, l3ctx.ipmgr_ctx.fd, l3ctx.icmp6_ctx.fd, l3ctx.icmp6_ctx.nsfd, l3ctx.arp_ctx.fd, l3ctx.socket_ctx.fd, l3ctx.wifistations_ctx.fd);
 				if (reconnect_fd(events[i].data.fd))
@@ -274,6 +267,8 @@ void usage() {
 	puts("  -n <clatif>        clat-interface.");
 	puts("  -t <export table>  export routes to this table");
 	puts("  -4 <prefix>        IPv4 translation prefix");
+	puts("  -f <v4-startaddr>  lowest IPv4 address in dnsmasq range");
+	puts("  -F <v4-endaddr>    highest IPv4 address in dnsmasq range");
 	puts("  -V|--version       show version information");
 	puts("  -D                 Device name for the l3roamd tun-device");
 	puts("  --no-netlink       do not use fdb or neighbour-table to learn new clients");
@@ -346,6 +341,9 @@ int main(int argc, char *argv[]) {
 	l3ctx.wifistations_ctx.nl80211_disabled = false;
 	l3ctx.icmp6_ctx.ndp_disabled = false;
 
+	inet_pton(AF_INET, "10.0.0.1", &l3ctx.clientmgr_ctx.start);
+	inet_pton(AF_INET, "10.255.255.254", &l3ctx.clientmgr_ctx.end);
+
 	l3ctx.debug = false;
 	l3ctx.l3device = strdup("l3roam0");
 
@@ -356,14 +354,14 @@ int main(int argc, char *argv[]) {
 	int option_index = 0;
 	struct option long_options[] = {
 		{ "help",       0, NULL, 'h' },
-		{ "no-netlink",     0, NULL, 'F' },
+		{ "no-netlink",     0, NULL, 'G' },
 		{ "no-nl80211", 0, NULL, 'N' },
 		{ "no-ndp",     0, NULL, 'X' },
 		{ "version",     0, NULL, 'V' }
 	};
 
 	int c;
-	while ((c = getopt_long(argc, argv, "dha:b:p:i:m:t:c:4:n:s:d:VD:P:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(argc, argv, "dha:b:p:i:m:t:c:4:f:F:n:s:d:VD:P:", long_options, &option_index)) != -1)
 		switch (c) {
 			case 'V':
 				printf("l3roamd %s\n", SOURCE_VERSION);
@@ -405,6 +403,17 @@ int main(int argc, char *argv[]) {
 					exit_error("IPv6 prefix must be /64");
 
 				add_prefix(&l3ctx.clientmgr_ctx.prefixes, _prefix);
+				break;
+			case 'f':
+				if (inet_pton(AF_INET, optarg, &l3ctx.clientmgr_ctx.start) < 1) {
+					exit_error("could not parse ipv4 start address");
+				}
+				break;
+			case 'F':
+				printf("gnaaaa\n");
+				if (inet_pton(AF_INET, optarg, &l3ctx.clientmgr_ctx.end) < 1) {
+					exit_error("could not parse ipv4 end address");
+				}
 				break;
 			case '4':
 				if (!parse_prefix(&l3ctx.clientmgr_ctx.v4prefix, optarg))
@@ -454,7 +463,7 @@ int main(int argc, char *argv[]) {
 				free(l3ctx.l3device);
 				l3ctx.l3device = strdupa(optarg);
 				break;
-			case 'F':
+			case 'G':
 				l3ctx.routemgr_ctx.nl_disabled = true;
 				break;
 			case 'N':

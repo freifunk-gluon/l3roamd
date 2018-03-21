@@ -65,12 +65,12 @@ void mac_addr_n2a(char *mac_addr, unsigned char *arg) {
 
 int address_allocate(struct in_addr *addrp, unsigned char *mac) {
 	// Find a free address like dnsmasq would. There is no collision checking
+	// can we actually query dnsmasq for the address it sends out?
 	struct in_addr start, addr;
 	int i, pass;
-	unsigned int j; 
+	unsigned int j;
 
-	/* hash mac: use the SDBM hashing algorithm.  Seems to give good
-	   dispersal even with similarly-valued "strings". */ 
+	/* hash mac: use the SDBM hashing algorithm. */
 	for (j = 0, i = 0; i < 6; i++)
 		j = mac[i] + (j << 6) + (j << 16) - j;
 
@@ -88,16 +88,19 @@ int address_allocate(struct in_addr *addrp, unsigned char *mac) {
 			/* Addresses which end in .255 and .0 will not be allocated by dnsmasq*/	    
 			if ((ntohl(addr.s_addr) & 0xff) != 0xff && ((ntohl(addr.s_addr) & 0xff) != 0x0))
 			{
-				// We could check if the address is used already here but would probably get in conflicht with dnsmasq
-				printf("WARNING address ends with 0 or ff\n");
+				print_ip4(&addr, " <<< generated an IP-address for client\n");
+				*addrp = addr;
+				return 1;
 			}
+			else {
+				// We could check if the address is used already here but would probably get in conflict with dnsmasq
+				printf("WARNING address ends with 0 or ff\n");
+				print_ip4(&addr, "\n");
+				addr.s_addr = htonl(ntohl(addr.s_addr) + 1);
 
-			// this is unfortunately seemingly broken in dnsmasq. the increment should only happen if the address cannot be used
-			addr.s_addr = htonl(ntohl(addr.s_addr) + 1);
-
-			if (addr.s_addr == htonl(ntohl(l3ctx.clientmgr_ctx.end.s_addr) + 1))
-				addr = l3ctx.clientmgr_ctx.start;
-
+				if (addr.s_addr == htonl(ntohl(l3ctx.clientmgr_ctx.end.s_addr) + 1))
+					addr = start;
+			}
 		} while (addr.s_addr != start.s_addr);
 	}
 
@@ -106,22 +109,18 @@ int address_allocate(struct in_addr *addrp, unsigned char *mac) {
 
 
 struct in6_addr mac2specialipv6(uint8_t mac[6]) {
-	// this should be: CLIENTNODEIPPREFIX/48 + CLIENTMAC + CLIENTIP
+	// generate the node-client-ip based on the scheme: CLIENTNODEIPPREFIX/48 + CLIENTMAC + CLIENTIP
 	struct in6_addr address = l3ctx.clientmgr_ctx.node_client_prefix.prefix;
+	struct in_addr v4addr;
 
-	address.s6_addr[6] = mac[0];
-	address.s6_addr[7] = mac[1];
-	address.s6_addr[8] = mac[2];
-	address.s6_addr[9] = mac[3];
-	address.s6_addr[10] = mac[4];
-	address.s6_addr[11] = mac[5];
+	address_allocate(&v4addr, mac);
 
-/*
-	address.s6_addr[12] = ip[0];
-	address.s6_addr[13] = ip[1];
-	address.s6_addr[14] = ip[2];
-	address.s6_addr[15] = ip[3];
-*/
+	for (int i = 0;i<6;i++)
+		address.s6_addr[6+i] = mac[i];
+
+	for (int i=0;i<4;i++)
+		address.s6_addr[12+i] = (v4addr.s_addr >> (i*8) ) & 0xff;
+
 	return address;
 }
 
