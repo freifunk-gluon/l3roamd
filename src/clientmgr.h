@@ -30,6 +30,7 @@ typedef struct client {
 	uint8_t mac[6];
 	VECTOR(struct client_ip) addresses;
 	int fd;
+	int fd2;
 	bool node_ip_initialized;
 } client_t;
 
