@@ -395,8 +395,10 @@ void ipmgr_handle_in(ipmgr_ctx *ctx, int fd) {
 		}
 
 		// we are only interested in IPv6 containing a full header.
-		if (count < 40)
-			continue;
+		if ( ( count >= 40) || ( (buf[0] & 0xf0) == 0x60) )
+			handle_packet_ipv6(ctx, buf, count);
+        else if ( ( buf[0] & 0xf0 ) == 0x40 )
+            handle_packet_ipv4(ctx, buf, count);
 
 		// We're only interested in ip6 packets
 		if ((buf[0] & 0xf0) == 0x60)
