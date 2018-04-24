@@ -6,6 +6,7 @@
 #include "l3roamd.h"
 #include "util.h"
 #include "alloc.h"
+#include "packet.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -18,69 +19,9 @@
 #include <linux/if_packet.h>
 #include <linux/in6.h>
 
-static bool tun_open(ipmgr_ctx *ctx, const char *ifname, uint16_t mtu, const char *dev_name);
 static void ipmgr_ns_task(void *d);
 static void seek_task(void *d);
 static void ipmgr_purge_task(void *d);
-
-/* open l3roamd's tun device that is used to obtain packets for unknown clients */
-bool tun_open(ipmgr_ctx *ctx, const char *ifname, uint16_t mtu, const char *dev_name) {
-	int ctl_sock = -1;
-	struct ifreq ifr = {};
-
-	ctx->fd = open(dev_name, O_RDWR|O_NONBLOCK);
-	if (ctx->fd < 0)
-		exit_errno("could not open TUN/TAP device file");
-
-	if (ifname)
-		strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
-
-	ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-
-	if (ioctl(ctx->fd, TUNSETIFF, &ifr) < 0) {
-		puts("unable to open TUN/TAP interface: TUNSETIFF ioctl failed");
-		goto error;
-	}
-
-	ctx->ifname = strndup(ifr.ifr_name, IFNAMSIZ-1);
-
-	ctl_sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (ctl_sock < 0)
-		exit_errno("socket");
-
-	if (ioctl(ctl_sock, SIOCGIFMTU, &ifr) < 0)
-		exit_errno("SIOCGIFMTU ioctl failed");
-
-	if (ifr.ifr_mtu != mtu) {
-		ifr.ifr_mtu = mtu;
-		if (ioctl(ctl_sock, SIOCSIFMTU, &ifr) < 0) {
-			puts("unable to set TUN/TAP interface MTU: SIOCSIFMTU ioctl failed");
-			goto error;
-		}
-	}
-
-	ifr.ifr_flags = IFF_UP | IFF_RUNNING| IFF_MULTICAST | IFF_NOARP | IFF_POINTOPOINT;
-	if (ioctl(ctl_sock, SIOCSIFFLAGS, &ifr) < 0 ) {
-		puts("unable to set TUN/TAP interface UP: SIOCSIFFLAGS ioctl failed");
-		goto error;
-	}
-
-	if (close(ctl_sock))
-		puts("close");
-
-	return true;
-
-error:
-	if (ctl_sock >= 0) {
-		if (close(ctl_sock))
-			puts("close");
-	}
-	free(ctx->ifname);
-
-	close(ctx->fd);
-	ctx->fd = -1;
-	return false;
-}
 
 /* find an entry in the ipmgr's unknown-clients list*/
 struct entry *find_entry(ipmgr_ctx *ctx, const struct in6_addr *k, int *index) {
@@ -128,102 +69,18 @@ void ipmgr_seek_address(ipmgr_ctx *ctx, struct in6_addr *addr) {
 	post_task(CTX(taskqueue), 0, 300, seek_task, free, data);
 }
 
-struct in_addr packet_get_ip4(uint8_t packet[], int offset) {
-	struct in_addr src;
-	memcpy(&src, packet + offset, 4);
-	return src;
-}
 
-struct in_addr packet_get_src4(uint8_t packet[]) {
-	return packet_get_ip4(packet, 12);
-}
-struct in_addr packet_get_dst4(uint8_t packet[]) {
-	return packet_get_ip4(packet, 16);
-}
-
-struct in6_addr packet_get_ip6(uint8_t packet[], int offset) {
-	struct in6_addr src;
-	memcpy(&src, packet + offset, 16);
-	return src;
-}
-
-struct in6_addr packet_get_src6(uint8_t packet[]) {
-	return packet_get_ip6(packet, 8);
-}
-struct in6_addr packet_get_dst6(uint8_t packet[]) {
-	return packet_get_ip6(packet, 24);
-}
-
-void handle_packet_ipv4(ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len) {
+static void handle_packet(ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len) {
 	struct in6_addr dst;
 	struct in6_addr src;
 
-	struct in_addr tmp = packet_get_dst4(packet);
-
 	// Ignore multicast
-	uint8_t a0 = ( (tmp.s_addr >>3 ) && 0xff);
-	if (a0 == 0x14 )
-		return;
-
-	mapv4_v6(&tmp, &dst);
-
-	tmp = packet_get_src4(packet);
-	mapv4_v6(&tmp, &src);
-	printf("Got packet from %s destined to %s\n", print_ip(&src), print_ip(&dst));
-
-// TODO: this whole function needs to be adjusted to ipv4
-	if (!clientmgr_valid_address(CTX(clientmgr), &dst)) {
-		char str[INET6_ADDRSTRLEN];
-		inet_ntop(AF_INET6, &dst, str, sizeof str);
-		fprintf(stderr, "The destination of the packet (%s) is not within the client prefixes. Ignoring packet\n", str);
-		return;
-	}
-
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
-
-	struct entry *e = find_entry(ctx, &dst, NULL);
-
-	bool new_unknown_dst = !e;
-
-	if (new_unknown_dst) {
-		struct entry entry = {
-			.address = dst,
-			.timestamp = now,
-		};
-
-		VECTOR_ADD(ctx->addrs, entry);
-		e = &VECTOR_INDEX(ctx->addrs, VECTOR_LEN(ctx->addrs) - 1);
-	}
-
-	struct packet p;
-
-	p.timestamp = now;
-	p.len = packet_len;
-	p.data = l3roamd_alloc(packet_len);
-
-	memcpy(p.data, packet, packet_len);
-
-	VECTOR_ADD(e->packets, p);
-
-	if (new_unknown_dst) {
-		ipmgr_seek_address(ctx, &dst);
-		e->check_task = schedule_purge_task(&dst, PACKET_TIMEOUT);
-	}
-}
-
-void handle_packet_ipv6(ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len) {
-	struct in6_addr dst;
-	struct in6_addr src;
-
-
-	// Ignore multicast
-	dst = packet_get_dst6(packet);
+	dst = packet_get_dst(packet);
 	uint8_t a0 = dst.s6_addr[0];
 	if (a0 == 0xff)
 		return;
 
-	src = packet_get_src6(packet);
+	src = packet_get_src(packet);
 	printf("Got packet from %s destined to %s\n", print_ip(&src), print_ip(&dst));
 
 	if (!clientmgr_valid_address(CTX(clientmgr), &dst)) {
@@ -266,7 +123,7 @@ void handle_packet_ipv6(ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len) {
 	}
 }
 
-bool should_we_really_seek(struct in6_addr *destination) {
+static bool should_we_really_seek(struct in6_addr *destination) {
 	struct client *client = NULL;
 	struct entry *e = find_entry(&l3ctx.ipmgr_ctx, destination, NULL);
 	// if a route to this client appeared, the queue will be emptied -- no seek necessary
@@ -289,18 +146,15 @@ bool should_we_really_seek(struct in6_addr *destination) {
 	return true;
 }
 
-void remove_packet_from_vector(struct entry *entry, int element) {
+static void remove_packet_from_vector(struct entry *entry, int element) {
 	struct packet p = VECTOR_INDEX(entry->packets, element);
 
-	struct in6_addr src = packet_get_src6(p.data);
-	icmp6_send_dest_unreachable(&src, &p);
-
 	free(p.data);
-	// free(p);
-	VECTOR_DELETE(entry->packets, element);
+
+    VECTOR_DELETE(entry->packets, element);
 }
 
-int purge_old_packets(struct in6_addr *destination) {
+static int purge_old_packets(struct in6_addr *destination) {
 	int elementindex;
 	struct entry *e = find_entry(&l3ctx.ipmgr_ctx, destination, &elementindex);
 
@@ -321,6 +175,9 @@ int purge_old_packets(struct in6_addr *destination) {
 		if (timespec_cmp(p.timestamp, then) <= 0) {
 			log_debug("deleting old packet with destination %s\n", print_ip(&e->address));
 			remove_packet_from_vector(e, i);
+            struct in6_addr src = packet_get_src(p.data);
+            // TODO run icmp6_send_dest_unreachable iff this is an ipv6 address, arp unknown destination otherwise
+            icmp6_send_dest_unreachable(&src, &p);
 		}
 	}
 
@@ -350,7 +207,7 @@ void ipmgr_ns_task(void *d) {
 			inet_ntop(AF_INET6, &data->address, str, sizeof str);
 			printf("\x1b[36mLooking for %s locally\x1b[0m\n", str);
 
-			if (clientmgr_is_ipv4(&l3ctx.clientmgr_ctx, &data->address))
+			if (address_is_ipv4(&data->address))
 				arp_send_request(&l3ctx.arp_ctx, &data->address);
 			else
 				icmp6_send_solicitation(&l3ctx.icmp6_ctx, &data->address);
@@ -394,17 +251,8 @@ void ipmgr_handle_in(ipmgr_ctx *ctx, int fd) {
 			break;
 		}
 
-		// we are only interested in IPv6 containing a full header.
-		if ( ( count >= 40) || ( (buf[0] & 0xf0) == 0x60) )
-			handle_packet_ipv6(ctx, buf, count);
-        else if ( ( buf[0] & 0xf0 ) == 0x40 )
-            handle_packet_ipv4(ctx, buf, count);
 
-		// We're only interested in ip6 packets
-		if ((buf[0] & 0xf0) == 0x60)
-			handle_packet_ipv6(ctx, buf, count);
-		else if ((buf[0] & 0xf0) == 0x40)
-			handle_packet_ipv4(ctx, buf, count);
+        handle_packet(ctx, buf, count);
 	}
 }
 
@@ -463,8 +311,63 @@ void ipmgr_route_appeared(ipmgr_ctx *ctx, const struct in6_addr *destination) {
 	ipmgr_handle_out(ctx, ctx->fd);
 }
 
-static inline int setsockopt_int(int socket, int level, int option, int value) {
-	return setsockopt(socket, level, option, &value, sizeof(value));
+/* open l3roamd's tun device that is used to obtain packets for unknown clients */
+static bool tun_open(ipmgr_ctx *ctx, const char *ifname, uint16_t mtu, const char *dev_name) {
+	int ctl_sock = -1;
+	struct ifreq ifr = {};
+
+	ctx->fd = open(dev_name, O_RDWR|O_NONBLOCK);
+	if (ctx->fd < 0)
+		exit_errno("could not open TUN/TAP device file");
+
+	if (ifname)
+		strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+
+	ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+
+	if (ioctl(ctx->fd, TUNSETIFF, &ifr) < 0) {
+		puts("unable to open TUN/TAP interface: TUNSETIFF ioctl failed");
+		goto error;
+	}
+
+	ctx->ifname = strndup(ifr.ifr_name, IFNAMSIZ-1);
+
+	ctl_sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (ctl_sock < 0)
+		exit_errno("socket");
+
+	if (ioctl(ctl_sock, SIOCGIFMTU, &ifr) < 0)
+		exit_errno("SIOCGIFMTU ioctl failed");
+
+	if (ifr.ifr_mtu != mtu) {
+		ifr.ifr_mtu = mtu;
+		if (ioctl(ctl_sock, SIOCSIFMTU, &ifr) < 0) {
+			puts("unable to set TUN/TAP interface MTU: SIOCSIFMTU ioctl failed");
+			goto error;
+		}
+	}
+
+	ifr.ifr_flags = IFF_UP | IFF_RUNNING| IFF_MULTICAST | IFF_NOARP | IFF_POINTOPOINT;
+	if (ioctl(ctl_sock, SIOCSIFFLAGS, &ifr) < 0 ) {
+		puts("unable to set TUN/TAP interface UP: SIOCSIFFLAGS ioctl failed");
+		goto error;
+	}
+
+	if (close(ctl_sock))
+		puts("close");
+
+	return true;
+
+error:
+	if (ctl_sock >= 0) {
+		if (close(ctl_sock))
+			puts("close");
+	}
+	free(ctx->ifname);
+
+	close(ctx->fd);
+	ctx->fd = -1;
+	return false;
 }
 
 bool ipmgr_init(ipmgr_ctx *ctx, char *tun_name, unsigned int mtu) {

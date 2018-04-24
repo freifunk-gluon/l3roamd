@@ -6,7 +6,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${L3ROAMD_BINARY_DIR} ${CMAKE_CU
 
 add_executable(l3roamd main.c socket.c config.c intercom.c arp.c ipmgr.c
 	icmp6.c syscallwrappers.c routemgr.c prefix.c vector.c wifistations.c
-	genl.c clientmgr.c taskqueue.c timespec.c util.c)
+	genl.c clientmgr.c taskqueue.c timespec.c util.c packet.c)
 
 target_link_libraries(l3roamd ${LIBNL_LIBRARIES} ${LIBNL_GENL_LIBRARIES} ${JSON_C_LIBRARIES})
 

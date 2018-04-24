@@ -428,7 +428,7 @@ void routemgr_probe_neighbor(routemgr_ctx *ctx, const int ifindex, struct in6_ad
 	size_t addr_len = 16;
 	void *addr = address->s6_addr;
 
-	if (clientmgr_is_ipv4(CTX(clientmgr), address)) {
+	if (address_is_ipv4(address)) {
 		log_debug("probing for IPv4-address! %s\n", print_ip((struct in6_addr*)addr));
 		addr = address->s6_addr + 12;
 		addr_len = 4;

@@ -55,7 +55,6 @@ struct client_task {
 
 void print_client(struct client *client);
 bool clientmgr_valid_address(clientmgr_ctx *ctx, struct in6_addr *ip);
-bool clientmgr_is_ipv4(clientmgr_ctx *ctx, struct in6_addr *ip);
 void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t *mac, unsigned int ifindex);
 void clientmgr_remove_address(clientmgr_ctx *ctx, struct client *client, struct in6_addr *address);
 void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex);

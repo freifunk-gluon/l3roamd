@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2017, Christof Schulze <christof.schulze@gmx.net>
+  Copyright (c) 2017,2018 Christof Schulze <christof.schulze@gmx.net>
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,7 @@
 
 #include "prefix.h"
 #include <string.h>
+
 #include "util.h"
 
 /* this will parse the string str and return a prefix struct
@@ -83,8 +84,9 @@ bool del_prefix(void *prefixes, struct prefix _prefix) {
 
 	return false;
 }
-#include <stdio.h>
-bool prefix_contains(const struct prefix *prefix, struct in6_addr *addr) {
+
+bool prefix_contains(const struct prefix* prefix, const struct in6_addr* addr)
+{
 	int offset=0;
 	if (prefix->isv4)  {
 		offset = 12; // ipv4 addresses are stored from the 12th byte onwards in an in6_addr
@@ -101,4 +103,6 @@ bool prefix_contains(const struct prefix *prefix, struct in6_addr *addr) {
 	}
 	return true;
 }
+
+
 

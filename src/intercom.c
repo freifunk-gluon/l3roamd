@@ -364,7 +364,7 @@ bool intercom_handle_seek(intercom_ctx *ctx, intercom_packet_seek *packet, int p
 
 				printf("\x1b[36mSEEK: Looking for %s\x1b[0m\n", print_ip(&address));
 
-				if (clientmgr_is_ipv4(CTX(clientmgr), &address))
+				if (address_is_ipv4(&address))
 					arp_send_request(CTX(arp), &address);
 				else
 					icmp6_send_solicitation(CTX(icmp6), &address);

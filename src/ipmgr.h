@@ -33,11 +33,7 @@
 #define PACKET_TIMEOUT 5  // drop packet after it sat in the unknown destination-queue for this amount of time
 #define SEEK_INTERVAL 3   // retry a seek every n seconds
 
-struct packet {
-	struct timespec timestamp;
-	ssize_t len;
-	uint8_t *data;
-};
+
 
 enum tasktype {
 	TASK_CHECK =0,

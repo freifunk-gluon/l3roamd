@@ -1,6 +1,7 @@
 #include "icmp6.h"
 #include "l3roamd.h"
 #include "util.h"
+#include "packet.h"
 
 #include <linux/in6.h>
 #include <stddef.h>

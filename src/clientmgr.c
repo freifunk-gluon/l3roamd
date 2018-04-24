@@ -261,7 +261,7 @@ void delete_client_ip(struct client *client, const struct in6_addr *address, boo
 void client_add_route(clientmgr_ctx *ctx, struct client *client, struct client_ip *ip) {
 
 	log_verbose("adding neighbour and route for %s", print_ip(&ip->addr));
-	if (clientmgr_is_ipv4(ctx, &ip->addr)) {
+	if (address_is_ipv4(&ip->addr)) {
 		log_verbose(" (IPv4)\n");
 		struct in_addr ip4 = {
 			.s_addr = ip->addr.s6_addr[15] << 24 | ip->addr.s6_addr[14] << 16 | ip->addr.s6_addr[13] << 8 | ip->addr.s6_addr[12]
@@ -281,7 +281,7 @@ void client_add_route(clientmgr_ctx *ctx, struct client *client, struct client_i
 /** Remove a route.
   */
 void clientmgr_client_remove_route(clientmgr_ctx *ctx, struct client *client, struct client_ip *ip) {
-	if (clientmgr_is_ipv4(ctx, &ip->addr)) {
+	if (address_is_ipv4(&ip->addr)) {
 		struct in_addr ip4 = {
 			.s_addr = ip->addr.s6_addr[15] << 24 | ip->addr.s6_addr[14] << 16 | ip->addr.s6_addr[13] << 8 | ip->addr.s6_addr[12]
 		};
@@ -548,11 +548,7 @@ bool clientmgr_valid_address(clientmgr_ctx *ctx, struct in6_addr *address) {
 	return false;
 }
 
-/** Check whether an IP address is contained in the IPv4 prefix or the empty prefix.
-  */
-bool clientmgr_is_ipv4(clientmgr_ctx *ctx, struct in6_addr *address) {
-	return prefix_contains(&ctx->v4prefix, address);
-}
+
 
 /** Remove an address from a client identified by its MAC.
 **/
