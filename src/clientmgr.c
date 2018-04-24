@@ -45,8 +45,7 @@ static const char *state_str(enum ip_state state);
 void mac_addr_n2a(char *mac_addr, unsigned char *arg) {
 	int i, l;
 
-	l = 0;
-	for (i = 0; i < 6; i++) {
+	for (i = 0, l = 0; i < 6; i++) {
 		if (i == 0) {
 			sprintf(mac_addr+l, "%02x", arg[i]);
 			l += 2;
@@ -55,6 +54,7 @@ void mac_addr_n2a(char *mac_addr, unsigned char *arg) {
 			l += 3;
 		}
 	}
+	mac_addr[17] = '\0';
 }
 
 
