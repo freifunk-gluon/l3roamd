@@ -457,7 +457,7 @@ bool intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet, int p
 				currentoffset += parse_plat(packetpointer, &client);
 				break;
 			case INFO_BASIC:
-				currentoffset += parse_basic( packetpointer, &client);
+				currentoffset += parse_basic(packetpointer, &client);
 				break;
 			default:
 				printf("unknown segment of type %i found in info packet. ignoring this piece\n", type);
