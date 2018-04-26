@@ -59,9 +59,8 @@ void rtnl_handle_neighbour ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
     struct ndmsg *msg = NLMSG_DATA ( nh );
     parse_rtattr ( tb, NDA_MAX, NDA_RTA ( msg ), nh->nlmsg_len - NLMSG_LENGTH ( sizeof ( *msg ) ) );
 
-    unsigned int br_index = if_nametoindex ( ctx->client_bridge ); // TODO: remember the br_index in context
 
-    if ( ! ( ctx->clientif_index == msg->ndm_ifindex || br_index == msg->ndm_ifindex ) )
+    if ( ! ( ctx->clientif_index == msg->ndm_ifindex || ctx->client_bridge_index == msg->ndm_ifindex ) )
         return;
 
     if ( tb[NDA_LLADDR] )
@@ -71,10 +70,9 @@ void rtnl_handle_neighbour ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
 
     if ( tb[NDA_DST] ) {
         if ( msg->ndm_family == AF_INET ) {
-            // form a transformed ipv6 address from the ipv4 address, we just parsed
             mapv4_v6 ( RTA_DATA ( tb[NDA_DST] ), &dst_address );
         } else
-            memcpy ( &dst_address, RTA_DATA ( tb[NDA_DST] ),16 );
+            memcpy ( &dst_address, RTA_DATA ( tb[NDA_DST] ), 16 );
 
         inet_ntop ( AF_INET6, &dst_address, ip_str, INET6_ADDRSTRLEN );
     }
@@ -86,7 +84,7 @@ void rtnl_handle_neighbour ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
     }
 
     char ifname[IFNAMSIZ+1] = "";
-    log_debug ( "neighbour [%s] (%s) changed on interface %s, type: %i, state: %i ... (msgif: %i cif: %i brif: %i)\n", mac_str, ip_str, if_indextoname ( msg->ndm_ifindex, ifname ), nh->nlmsg_type, msg->ndm_state, msg->ndm_ifindex, ctx->clientif_index, br_index ); // see include/uapi/linux/neighbour.h NUD_REACHABLE for numeric values
+    log_debug ( "neighbour [%s] (%s) changed on interface %s, type: %i, state: %i ... (msgif: %i cif: %i brif: %i)\n", mac_str, ip_str, if_indextoname ( msg->ndm_ifindex, ifname ), nh->nlmsg_type, msg->ndm_state, msg->ndm_ifindex, ctx->clientif_index, ctx->client_bridge_index ); // see include/uapi/linux/neighbour.h NUD_REACHABLE for numeric values
 
     if ( msg->ndm_state & NUD_REACHABLE ) {
         if ( nh->nlmsg_type == RTM_NEWNEIGH && tb[NDA_DST] && tb[NDA_LLADDR] ) {
@@ -303,6 +301,8 @@ void routemgr_init ( routemgr_ctx *ctx )
     }
 
     ctx->clientif_index = if_nametoindex ( ctx->clientif );
+    ctx->client_bridge_index = if_nametoindex ( ctx->client_bridge );
+
     routemgr_initial_neighbours ( ctx, AF_INET );
     routemgr_initial_neighbours ( ctx, AF_INET6 );
 }

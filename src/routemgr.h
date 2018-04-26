@@ -50,6 +50,7 @@ typedef struct {
 	char *client_bridge;
 	int fd;
 	int clientif_index;
+	int client_bridge_index;
 	bool nl_disabled;
 	uint8_t bridge_mac[ETH_ALEN];
 } routemgr_ctx;
