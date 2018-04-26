@@ -1,5 +1,6 @@
 /*
   Copyright (c) 2015, Nils Schneider <nils@nilsschneider.net>
+  Copyright (c) 2017,2018, Christof Schulze <christof.schulze@gmx.net>
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -33,37 +34,28 @@
 #define PACKET_TIMEOUT 5  // drop packet after it sat in the unknown destination-queue for this amount of time
 #define SEEK_INTERVAL 3   // retry a seek every n seconds
 
-
-
-enum tasktype {
-	TASK_CHECK =0,
-	TASK_SEEK
-};
-
 struct entry {
-	struct in6_addr address;
-	struct timespec timestamp;
-	taskqueue_t *check_task;
-	enum tasktype type;
-	VECTOR(struct packet) packets;
+    struct in6_addr address;
+    taskqueue_t *check_task;
+    VECTOR ( struct packet ) packets;
 };
 
 typedef struct {
-	struct l3ctx *l3ctx;
-	char *ifname;
-	VECTOR(struct entry) addrs;
-	VECTOR(struct packet) output_queue;
-	int fd;
+    struct l3ctx *l3ctx;
+    char *ifname;
+    VECTOR ( struct entry ) addrs;
+    VECTOR ( struct packet ) output_queue;
+    int fd;
 } ipmgr_ctx;
 
 struct ip_task {
-	struct in6_addr address;
-	ipmgr_ctx *ctx;
+    struct in6_addr address;
+    ipmgr_ctx *ctx;
 };
 
-bool ipmgr_init(ipmgr_ctx *ctx, char *tun_name, unsigned int mtu);
-void ipmgr_route_appeared(ipmgr_ctx *ctx, const struct in6_addr *destination);
-void ipmgr_handle_in(ipmgr_ctx *ctx, int fd);
-void ipmgr_handle_out(ipmgr_ctx *ctx, int fd);
-void ipmgr_seek_address(ipmgr_ctx *ctx, struct in6_addr *addr);
+bool ipmgr_init ( ipmgr_ctx *ctx, char *tun_name, unsigned int mtu );
+void ipmgr_route_appeared ( ipmgr_ctx *ctx, const struct in6_addr *destination );
+void ipmgr_handle_in ( ipmgr_ctx *ctx, int fd );
+void ipmgr_handle_out ( ipmgr_ctx *ctx, int fd );
+void ipmgr_seek_address ( ipmgr_ctx *ctx, struct in6_addr *addr );
 

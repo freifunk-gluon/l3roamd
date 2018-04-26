@@ -303,7 +303,7 @@ struct client *findinvector(void *_vector, const uint8_t mac[ETH_ALEN]) {
 	for (int i = VECTOR_LEN(*vector) -1 ; i>=0; i--) {
 		struct client *e = &VECTOR_INDEX(*vector, i);
 
-		if (e->mac && memcmp(mac, e->mac, sizeof(uint8_t) * 6) == 0)
+		if ( (e->mac != NULL ) && ( memcmp(mac, e->mac, sizeof(uint8_t) * 6) == 0) )
 			return e;
 	}
 
