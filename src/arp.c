@@ -31,7 +31,7 @@ void arp_handle_in(arp_ctx *ctx, int fd) {
 		.msg_controllen = sizeof (cbuf)
 	};
 
-	ssize_t rc = recvmsg(ctx->fd, &hdr, 0);
+	ssize_t rc = recvmsg(fd, &hdr, 0);
 
 	if (rc == -1)
 		return;
