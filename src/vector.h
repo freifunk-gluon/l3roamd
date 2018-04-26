@@ -56,7 +56,7 @@ typedef struct l3roamd_vector_desc {
 
 
 void _l3roamd_vector_resize(l3roamd_vector_desc_t *desc, void **data, size_t n, size_t elemsize);
-void _l3roamd_vector_insert(l3roamd_vector_desc_t *desc, void **data, void *element, size_t pos, size_t elemsize);
+void *_l3roamd_vector_insert(l3roamd_vector_desc_t *desc, void **data, void *element, size_t pos, size_t elemsize);
 void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos, size_t elemsize);
 
 
@@ -106,7 +106,7 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
 #define VECTOR_INSERT(v, elem, pos) ({					\
 			__typeof__(v) *_v = &(v);			\
 			__typeof__(*_v->data) _e = (elem);		\
-			_l3roamd_vector_insert(&_v->desc, (void **)&_v->data, &_e, (pos), sizeof(_e)); \
+			return _l3roamd_vector_insert(&_v->desc, (void **)&_v->data, &_e, (pos), sizeof(_e)); \
 		})
 
 /**

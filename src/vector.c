@@ -71,13 +71,14 @@ void _l3roamd_vector_resize(l3roamd_vector_desc_t *desc, void **data, size_t n, 
 
    Internal function, use VECTOR_INSERT() and VECTOR_ADD() instead.
 */
-void _l3roamd_vector_insert(l3roamd_vector_desc_t *desc, void **data, void *element, size_t pos, size_t elemsize) {
+void *_l3roamd_vector_insert(l3roamd_vector_desc_t *desc, void **data, void *element, size_t pos, size_t elemsize) {
 	_l3roamd_vector_resize(desc, data, desc->length+1, elemsize);
 
 	void *p = *data + pos*elemsize;
 
 	memmove(p+elemsize, p, (desc->length-pos-1)*elemsize);
 	memcpy(p, element, elemsize);
+    return(p);
 }
 
 /**

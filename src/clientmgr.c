@@ -603,8 +603,7 @@ void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t
 	if (ip_is_new) {
 		struct client_ip _ip = {};
 		memcpy(&_ip.addr, address, sizeof(struct in6_addr));
-		VECTOR_ADD(client->addresses, _ip);
-		ip = &VECTOR_INDEX(client->addresses, VECTOR_LEN(client->addresses) - 1);
+		ip = VECTOR_ADD(client->addresses, _ip);
 		print_client(client);
 	}
 	client_ip_set_state(ctx, client, ip, IP_ACTIVE);
