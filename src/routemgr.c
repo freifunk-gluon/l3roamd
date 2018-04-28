@@ -11,7 +11,7 @@
 #include <sys/ioctl.h>
 
 static void rtnl_change_address ( routemgr_ctx *ctx, struct in6_addr *address, int type, int flags );
-static void rtnl_handle_link ( routemgr_ctx *ctx, const struct nlmsghdr *nh );
+static void rtnl_handle_link ( const struct nlmsghdr *nh );
 static int rtnl_addattr ( struct nlmsghdr *n, int maxlen, int type, void *data, int datalen );
 static void rtmgr_rtnl_talk ( routemgr_ctx *ctx, struct nlmsghdr *req );
 
@@ -159,7 +159,7 @@ void client_bridge_changed ( const struct nlmsghdr *nh, const struct ifinfomsg *
 
 }
 
-void rtnl_handle_link ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
+void rtnl_handle_link ( const struct nlmsghdr *nh )
 {
     const struct ifinfomsg *msg = NLMSG_DATA ( nh );
 
@@ -172,13 +172,8 @@ void rtnl_handle_link ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
 void handle_kernel_routes ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
 {
     struct kernel_route route;
-
-    int len;
-
+    int len = nh->nlmsg_len;
     struct rtmsg *rtm;
-
-    len = nh->nlmsg_len;
-
 
     rtm = ( struct rtmsg* ) NLMSG_DATA ( nh );
     len -= NLMSG_LENGTH ( 0 );
@@ -195,8 +190,9 @@ void handle_kernel_routes ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
         return;
 
     /* only interested in host routes */
-    if ( ( rtm->rtm_family == AF_INET6 ) && ( route.plen != 128 ) )
+    if ( ( route.plen != 128 ) )
         return;
+
 
     if ( clientmgr_valid_address ( &l3ctx.clientmgr_ctx, &route.prefix ) ) {
         ipmgr_route_appeared ( CTX ( ipmgr ), &route.prefix );
@@ -223,7 +219,7 @@ void rtnl_handle_msg ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
     case RTM_DELLINK:
     case RTM_SETLINK:
         log_debug ( "handling netlink message for link change\n" );
-        rtnl_handle_link ( ctx, nh );
+        rtnl_handle_link ( nh );
         break;
     default:
         log_debug ( "not handling unknown netlink message with type: %i\n", nh->nlmsg_type );
@@ -249,13 +245,6 @@ static void routemgr_initial_neighbours ( routemgr_ctx *ctx, uint8_t family )
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr * ) &req );
 }
 
-void routemgr_destroy ( routemgr_ctx *ctx )
-{
-    // TODO: remove all routes here
-    del_fd ( l3ctx.efd, ctx->fd );
-    close ( ctx->fd );
-}
-
 void routemgr_init ( routemgr_ctx *ctx )
 {
     printf ( "initializing routemgr\n" );
@@ -279,8 +268,11 @@ void routemgr_init ( routemgr_ctx *ctx )
         struct prefix *prefix = & ( VECTOR_INDEX ( CTX ( clientmgr )->prefixes, i ) );
         inet_ntop ( AF_INET6, prefix->prefix.s6_addr, str, INET6_ADDRSTRLEN );
         printf ( "Activating route for prefix %s/%i on device %s(%i) in main routing-table\n", str, prefix->plen, CTX ( ipmgr )->ifname, if_nametoindex ( CTX ( ipmgr )->ifname ) );
-
-        routemgr_insert_route ( ctx, 254, if_nametoindex ( CTX ( ipmgr )->ifname ), ( struct in6_addr* ) ( prefix->prefix.s6_addr ), prefix->plen );
+        if ( prefix->isv4 ) {
+            struct in_addr ip4  = extractv4_v6 ( &prefix->prefix );
+            routemgr_insert_route4 ( ctx, 254, if_nametoindex ( CTX ( ipmgr )->ifname ), &ip4, prefix->plen - 96 );
+        } else
+            routemgr_insert_route ( ctx, 254, if_nametoindex ( CTX ( ipmgr )->ifname ), ( struct in6_addr* ) ( prefix->prefix.s6_addr ), prefix->plen );
     }
 
     if ( !l3ctx.clientif_set ) {
@@ -318,15 +310,39 @@ int parse_kernel_route_rta ( struct rtmsg *rtm, int len, struct kernel_route *ro
     for ( struct rtattr *rta = RTM_RTA ( rtm ); RTA_OK ( rta, len ); rta = RTA_NEXT ( rta, len ) ) {
         switch ( rta->rta_type ) {
         case RTA_DST:
-            route->plen = rtm->rtm_dst_len;
-            memcpy ( route->prefix.s6_addr, RTA_DATA ( rta ), 16 );
+
+            if ( rtm->rtm_family == AF_INET6 ) {
+                route->plen = rtm->rtm_dst_len;
+                memcpy ( route->prefix.s6_addr, RTA_DATA ( rta ), 16 );
+                log_debug ( "parsed route, found dst: %s\n", print_ip ( &route->prefix ) );
+
+            } else if ( rtm->rtm_family == AF_INET ) {
+                struct in_addr ipv4;
+                memcpy ( &ipv4.s_addr, RTA_DATA ( rta ), 4 );
+                mapv4_v6 ( &ipv4, &route->prefix );
+                route->plen = rtm->rtm_dst_len + 96;
+                log_debug ( "parsed route, found dst: %s\n", print_ip ( &route->prefix ) );
+            }
             break;
         case RTA_SRC:
-            route->src_plen = rtm->rtm_src_len;
-            memcpy ( route->src_prefix.s6_addr, RTA_DATA ( rta ), 16 );
+            if ( rtm->rtm_family == AF_INET6 ) {
+                route->src_plen = rtm->rtm_src_len;
+                memcpy ( route->src_prefix.s6_addr, RTA_DATA ( rta ), 16 );
+            } else if ( rtm->rtm_family == AF_INET ) {
+                struct in_addr ipv4;
+                memcpy ( &ipv4.s_addr, RTA_DATA ( rta ), 4 );
+                mapv4_v6 ( &ipv4, &route->src_prefix );
+                route->plen = rtm->rtm_src_len + 96;
+            }
             break;
         case RTA_GATEWAY:
-            memcpy ( route->gw.s6_addr, RTA_DATA ( rta ), 16 );
+            if ( rtm->rtm_family == AF_INET6 ) {
+                memcpy ( route->gw.s6_addr, RTA_DATA ( rta ), 16 );
+            } else if ( rtm->rtm_family == AF_INET ) {
+                struct in_addr ipv4;
+                memcpy ( &ipv4.s_addr, RTA_DATA ( rta ), 4 );
+                mapv4_v6 ( &ipv4, &route->prefix );
+            }
             break;
         case RTA_OIF:
             route->ifindex = * ( int* ) RTA_DATA ( rta );
@@ -637,8 +653,9 @@ void routemgr_remove_neighbor4 ( routemgr_ctx *ctx, const int ifindex, struct in
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr* ) &req );
 }
 
-void routemgr_insert_route4 ( routemgr_ctx *ctx, const int table, const int ifindex, struct in_addr *address )
+void routemgr_insert_route4 ( routemgr_ctx *ctx, const int table, const int ifindex, struct in_addr *address , const int plen )
 {
+
     struct nlrtreq req = {
         .nl = {
             .nlmsg_type = RTM_NEWROUTE,
@@ -651,7 +668,7 @@ void routemgr_insert_route4 ( routemgr_ctx *ctx, const int table, const int ifin
             .rtm_protocol = ROUTE_PROTO,
             .rtm_scope = RT_SCOPE_UNIVERSE,
             .rtm_type = RTN_UNICAST,
-            .rtm_dst_len = 32
+            .rtm_dst_len = plen
         },
     };
 
@@ -661,7 +678,7 @@ void routemgr_insert_route4 ( routemgr_ctx *ctx, const int table, const int ifin
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr * ) &req );
 }
 
-void routemgr_remove_route4 ( routemgr_ctx *ctx, const int table, struct in_addr *address )
+void routemgr_remove_route4 ( routemgr_ctx *ctx, const int table, struct in_addr *address, const int plen )
 {
     struct nlrtreq req1 = {
         .nl = {
@@ -673,11 +690,11 @@ void routemgr_remove_route4 ( routemgr_ctx *ctx, const int table, struct in_addr
             .rtm_family = AF_INET,
             .rtm_table = table,
             .rtm_type = RTN_THROW,
-            .rtm_dst_len = 32
+            .rtm_dst_len = plen
         }
     };
 
-    rtnl_addattr ( &req1.nl, sizeof ( req1 ), RTA_DST, ( void* ) address, sizeof ( struct in_addr ) );
+    rtnl_addattr ( &req1.nl, sizeof ( req1 ), RTA_DST, ( void* ) &address[12], sizeof ( struct in_addr ) );
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr * ) &req1 );
 
     struct nlrtreq req2 = {

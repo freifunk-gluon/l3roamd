@@ -23,27 +23,31 @@ static void ipmgr_ns_task ( void *d );
 static void seek_task ( void *d );
 static void ipmgr_purge_task ( void *d );
 
-/* find an entry in the ipmgr's unknown-clients list*/
-struct entry *find_entry ( ipmgr_ctx *ctx, const struct in6_addr *k, int *index )
-{
-    // TODO: make use of VECTOR_BSEARCH here.
-    for ( int i = 0; i < VECTOR_LEN ( ctx->addrs ); i++ ) {
-        struct entry *e = &VECTOR_INDEX ( ctx->addrs, i );
-        if ( memcmp ( k, & ( e->address ), sizeof ( struct in6_addr ) ) == 0 ) {
-            log_debug ( "%s is on the unknown-clients list\n", print_ip ( k ) );
-            if ( index )
-                *index = i;
-            return e;
-        }
-    }
 
-    return NULL;
+static int entry_compare ( const struct unknown_address *a, const struct unknown_address *b )
+{
+    return memcmp ( &a->address, &b->address, sizeof ( struct in6_addr ) );
 }
 
 
-struct entry *add_entry ( const struct in6_addr *dst )
+/* find an entry in the ipmgr's unknown-clients list*/
+struct unknown_address *find_entry ( ipmgr_ctx *ctx, const struct in6_addr *k, int *elementindex )
 {
-    struct entry e = {
+    struct unknown_address key = { .address = *k};
+    struct unknown_address *ret = VECTOR_LSEARCH ( &key, ctx->addrs, entry_compare );
+    if ( ret != NULL && elementindex != NULL )
+        *elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( ctx->addrs, 0 ) ) / sizeof ( struct unknown_address );
+    log_debug ( "%s is on the unknown-clients list", print_ip ( k ) );
+    if ( elementindex )
+        log_debug ( " on index %i", *elementindex );
+    log_debug ( "\n" );
+    return ret;
+}
+
+
+struct unknown_address *add_entry ( const struct in6_addr *dst )
+{
+    struct unknown_address e = {
         .address = *dst
     };
 
@@ -85,18 +89,24 @@ void ipmgr_seek_address ( ipmgr_ctx *ctx, struct in6_addr *addr )
 }
 
 
+static bool ismulticast ( const struct in6_addr *addr )
+{
+    if ( address_is_ipv4 ( addr ) ) {
+        if ( addr->s6_addr[12] >= 224 && addr->s6_addr[12] < 240 )
+            return true;
+    } else {
+        if ( addr->s6_addr[0] == 0xff )
+            return true;
+    }
+    return false;
+}
+
 static void handle_packet ( ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len )
 {
-    struct in6_addr dst, src;
+    struct in6_addr dst = packet_get_dst ( packet );
 
-    // Ignore multicast
-    dst = packet_get_dst ( packet );
-    uint8_t a0 = dst.s6_addr[0];
-    if ( a0 == 0xff )
+    if ( ismulticast ( &dst ) )
         return;
-
-    src = packet_get_src ( packet );
-    printf ( "Got packet from %s destined to %s\n", print_ip ( &src ), print_ip ( &dst ) );
 
     if ( !clientmgr_valid_address ( CTX ( clientmgr ), &dst ) ) {
         char str[INET6_ADDRSTRLEN];
@@ -105,10 +115,14 @@ static void handle_packet ( ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len
         return;
     }
 
+    struct in6_addr src = packet_get_src ( packet );
+    log_verbose ( "Got packet from %s destined to %s\n", print_ip ( &src ), print_ip ( &dst ) );
+
+
     struct timespec now;
     clock_gettime ( CLOCK_MONOTONIC, &now );
 
-    struct entry *e = find_entry ( ctx, &dst, NULL );
+    struct unknown_address *e = find_entry ( ctx, &dst, NULL );
 
     bool new_unknown_dst = !e;
 
@@ -135,7 +149,7 @@ static void handle_packet ( ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len
 static bool should_we_really_seek ( struct in6_addr *destination )
 {
     struct client *client = NULL;
-    struct entry *e = find_entry ( &l3ctx.ipmgr_ctx, destination, NULL );
+    struct unknown_address *e = find_entry ( &l3ctx.ipmgr_ctx, destination, NULL );
     // if a route to this client appeared, the queue will be emptied -- no seek necessary
     if ( !e ) {
         log_debug ( "INFO: seek task was scheduled but no packets to be delivered to host: %s\n",  print_ip ( destination ) );
@@ -156,7 +170,7 @@ static bool should_we_really_seek ( struct in6_addr *destination )
     return true;
 }
 
-static void remove_packet_from_vector ( struct entry *entry, int element )
+static void remove_packet_from_vector ( struct unknown_address *entry, int element )
 {
     struct packet p = VECTOR_INDEX ( entry->packets, element );
 
@@ -167,8 +181,8 @@ static void remove_packet_from_vector ( struct entry *entry, int element )
 
 static int purge_old_packets ( struct in6_addr *destination )
 {
-    int elementindex;
-    struct entry *e = find_entry ( &l3ctx.ipmgr_ctx, destination, &elementindex );
+    int elementindex = 0;
+    struct unknown_address *e = find_entry ( &l3ctx.ipmgr_ctx, destination, &elementindex );
 
     if ( !e )
         return 0;
@@ -179,18 +193,21 @@ static int purge_old_packets ( struct in6_addr *destination )
         return -1; //skip this purging-cycle
     }
 
-    struct timespec then = now;
-    then.tv_sec -= PACKET_TIMEOUT;
+    struct timespec then = {
+        .tv_sec = now.tv_sec - PACKET_TIMEOUT,
+        .tv_nsec = now.tv_nsec
+    };
 
     for ( int i = VECTOR_LEN ( e->packets ) - 1; i>=0; i-- ) {
         struct packet p = VECTOR_INDEX ( e->packets, i );
         if ( timespec_cmp ( p.timestamp, then ) <= 0 ) {
             log_debug ( "deleting old packet with destination %s\n", print_ip ( &e->address ) );
-            remove_packet_from_vector ( e, i );
+
             struct in6_addr src = packet_get_src ( p.data );
             // TODO run arp request here if src is an ipv4 address
             if ( !address_is_ipv4 ( &src ) )
                 icmp6_send_dest_unreachable ( &src, &p );
+            remove_packet_from_vector ( e, i );
         }
     }
 
@@ -207,7 +224,7 @@ static int purge_old_packets ( struct in6_addr *destination )
 void ipmgr_purge_task ( void *d )
 {
     struct ip_task *data = d;
-    struct entry *e = find_entry ( &l3ctx.ipmgr_ctx, &data->address, NULL );
+    struct unknown_address *e = find_entry ( &l3ctx.ipmgr_ctx, &data->address, NULL );
     if ( purge_old_packets ( &data->address ) )
         e->check_task = schedule_purge_task ( &data->address, 1 );
 }
@@ -308,10 +325,12 @@ void ipmgr_handle_out ( ipmgr_ctx *ctx, int fd )
 
 void ipmgr_route_appeared ( ipmgr_ctx *ctx, const struct in6_addr *destination )
 {
-    struct entry *e = find_entry ( ctx, destination, NULL );
+    struct unknown_address *e = find_entry ( ctx, destination, NULL );
 
-    if ( !e )
+    if ( !e ) {
+        log_debug ( "route appeared for a client that we do not know: %s\n", print_ip ( destination ) );
         return;
+    }
 
     for ( int i = 0; i < VECTOR_LEN ( e->packets ); i++ ) {
         struct packet p = VECTOR_INDEX ( e->packets, i );
@@ -363,13 +382,11 @@ static bool tun_open ( ipmgr_ctx *ctx, const char *ifname, uint16_t mtu, const c
     }
 
     ifr.ifr_flags = IFF_UP | IFF_RUNNING| IFF_MULTICAST | IFF_NOARP | IFF_POINTOPOINT;
-    if ( ioctl ( ctl_sock, SIOCSIFFLAGS, &ifr ) < 0 ) {
-        puts ( "unable to set TUN/TAP interface UP: SIOCSIFFLAGS ioctl failed" );
-        goto error;
-    }
+    if ( ioctl ( ctl_sock, SIOCSIFFLAGS, &ifr ) < 0 )
+        exit_errno ( "unable to set TUN/TAP interface UP: SIOCSIFFLAGS ioctl failed" );
 
     if ( close ( ctl_sock ) )
-        puts ( "close" );
+        puts ( "close of ctl_sock failed." );
 
     return true;
 

@@ -66,8 +66,8 @@ void routemgr_insert_route(routemgr_ctx *ctx, const int table, const int ifindex
 void routemgr_remove_route(routemgr_ctx *ctx, const int table, struct in6_addr *address, const int prefix_length);
 void routemgr_insert_neighbor4(routemgr_ctx *ctx, const int ifindex, struct in_addr *address, uint8_t mac[ETH_ALEN]);
 void routemgr_remove_neighbor4(routemgr_ctx *ctx, const int ifindex, struct in_addr *address, uint8_t mac[ETH_ALEN]);
-void routemgr_insert_route4(routemgr_ctx *ctx, const int table, const int ifindex, struct in_addr *address);
-void routemgr_remove_route4(routemgr_ctx *ctx, const int table, struct in_addr *address);
+void routemgr_insert_route4(routemgr_ctx *ctx, const int table, const int ifindex, struct in_addr *address, const int prefix_length);
+void routemgr_remove_route4(routemgr_ctx *ctx, const int table, struct in_addr *address, const int prefix_length);
 void rtnl_add_address(routemgr_ctx *ctx, struct in6_addr *address);
 void rtnl_remove_address(routemgr_ctx *ctx, struct in6_addr *address);
 

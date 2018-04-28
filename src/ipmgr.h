@@ -34,7 +34,7 @@
 #define PACKET_TIMEOUT 5  // drop packet after it sat in the unknown destination-queue for this amount of time
 #define SEEK_INTERVAL 3   // retry a seek every n seconds
 
-struct entry {
+struct unknown_address {
     struct in6_addr address;
     taskqueue_t *check_task;
     VECTOR ( struct packet ) packets;
@@ -43,7 +43,7 @@ struct entry {
 typedef struct {
     struct l3ctx *l3ctx;
     char *ifname;
-    VECTOR ( struct entry ) addrs;
+    VECTOR ( struct unknown_address ) addrs;
     VECTOR ( struct packet ) output_queue;
     int fd;
 } ipmgr_ctx;

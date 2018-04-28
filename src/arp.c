@@ -59,6 +59,8 @@ void arp_handle_in ( arp_ctx *ctx, int fd )
     clientmgr_add_address ( CTX ( clientmgr ), &address, packet.sha, ctx->ifindex );
 }
 
+// TODO implement arp_destination_unreachable
+
 void arp_send_request ( arp_ctx *ctx, const struct in6_addr *addr )
 {
     struct arp_packet packet = {

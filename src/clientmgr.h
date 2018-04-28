@@ -54,8 +54,8 @@ struct client_task {
 };
 
 void print_client(struct client *client);
-bool clientmgr_valid_address(clientmgr_ctx *ctx, struct in6_addr *ip);
-void clientmgr_add_address(clientmgr_ctx *ctx, struct in6_addr *address, uint8_t *mac, unsigned int ifindex);
+bool clientmgr_valid_address(clientmgr_ctx *ctx, const struct in6_addr *ip);
+void clientmgr_add_address(clientmgr_ctx *ctx, const struct in6_addr *address, const uint8_t *mac, const unsigned int ifindex);
 void clientmgr_remove_address(clientmgr_ctx *ctx, struct client *client, struct in6_addr *address);
 void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex);
 bool clientmgr_handle_claim(clientmgr_ctx *ctx, const struct in6_addr *sender, uint8_t mac[ETH_ALEN]);
@@ -67,7 +67,7 @@ struct client *get_client(const uint8_t mac[ETH_ALEN]);
 bool clientmgr_is_known_address(clientmgr_ctx *ctx, const struct in6_addr *address, struct client **client);
 void add_special_ip(clientmgr_ctx *ctx, struct client *client);
 struct client_ip *get_client_ip(struct client *client, const struct in6_addr *address);
-void mac_addr_n2a(char *mac_addr, unsigned char *arg);
+void mac_addr_n2a(char *mac_addr, const unsigned char *arg);
 struct in6_addr mac2ipv6(uint8_t mac[ETH_ALEN], struct prefix *prefix);
 void clientmgr_init();
 bool client_is_active(const struct client *client);

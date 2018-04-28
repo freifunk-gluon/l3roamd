@@ -92,3 +92,5 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
 
 	_l3roamd_vector_resize(desc, data, desc->length-1, elemsize);
 }
+
+

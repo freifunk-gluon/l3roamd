@@ -33,6 +33,8 @@
 #pragma once
 
 #include <stdlib.h>
+#include <search.h>
+
 
 
 /** A vector descriptor */
@@ -140,4 +142,16 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
 			const __typeof__(*_v->data) *_key = (key);	\
 			int (*_cmp)(__typeof__(_key), __typeof__(_key)) = (cmp); \
 			(__typeof__(_v->data))bsearch(_key, _v->data, _v->desc.length, sizeof(*_v->data), (int (*)(const void *, const void *))_cmp); \
+		})
+
+/**
+   Performs a linear search on the vector \e v, returning a pointer to a matching vector element
+
+   \hideinitializer
+*/
+#define VECTOR_LSEARCH(key, v, cmp) ({					\
+			__typeof__(v) *_v = &(v);			\
+			const __typeof__(*_v->data) *_key = (key);	\
+			int (*_cmp)(__typeof__(_key), __typeof__(_key)) = (cmp); \
+			(__typeof__(_v->data))lfind(_key, _v->data, &_v->desc.length, sizeof(*_v->data), (int (*)(const void *, const void *))_cmp); \
 		})

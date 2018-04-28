@@ -358,34 +358,3 @@ void icmp6_send_solicitation(icmp6_ctx *ctx, const struct in6_addr *addr) {
 		retries--;
 	}
 }
-
-/*
-void icmp6_send_echo_request() {
-	struct icmp6_hdr icmp6;
-	int sock;
-	struct icmp6_filter filterv6;
-	struct ifreq ifr;
-
-	sock = socket(AF_INET6, SOCK_RAW,IPPROTO_ICMPV6);
-
-	ICMP6_FILTER_SETBLOCKALL(&filterv6);
-	ICMP6_FILTER_SETPASS(ICMP6_DST_UNREACH, &filterv6);
-	ICMP6_FILTER_SETPASS(ICMP6_PACKET_TOO_BIG, &filterv6);
-	ICMP6_FILTER_SETPASS(ICMP6_TIME_EXCEEDED, &filterv6);
-	ICMP6_FILTER_SETPASS(ICMP6_PARAM_PROB, &filterv6);  
-	ICMP6_FILTER_SETPASS(ICMP6_ECHO_REPLY, &filterv6);
-	ICMP6_FILTER_SETPASS(ND_REDIRECT, &filterv6);
-
-	setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filterv6, sizeof (filterv6));
-	setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof ifr);
-
-	icmp6.icmp6_type = ICMP6_ECHO_REQUEST;
-	icmp6.icmp6_code = 0;
-	icmp6.icmp6_cksum = 0;
-	icmp6.icmp6_id = id;
-	icmp6.icmp6_seq = 100;
-
-	if( (sendto(sock, &icmp6, sizeof(struct icmp6_hdr), 0, (struct sockaddr *)dest, socklen)) != sizeof(struct icmp6_hdr))
-		perror("icmp6 echo request sendto");
-}
-*/

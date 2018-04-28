@@ -14,6 +14,13 @@ const char inline *print_ip(const struct in6_addr *addr) {
 	return inet_ntop(AF_INET6, &(addr->s6_addr), ipaddress_buffer, INET6_ADDRSTRLEN);
 }
 
+struct in_addr extractv4_v6(const struct in6_addr *src) {
+        struct in_addr ip4 = {
+            .s_addr = src->s6_addr[15] << 24 | src->s6_addr[14] << 16 | src->s6_addr[13] << 8 | src->s6_addr[12]
+        };	
+	return ip4;
+}
+
 void inline mapv4_v6(const struct in_addr *src, struct in6_addr *dst) {
 	memcpy(dst, &l3ctx.clientmgr_ctx.v4prefix,12);
 	memcpy(&(dst->s6_addr)[12], src, 4);
