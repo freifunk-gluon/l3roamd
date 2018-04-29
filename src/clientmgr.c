@@ -38,6 +38,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <stdbool.h>
 
 /* Static functions used only in this file. */
 static const char *state_str ( enum ip_state state );
@@ -278,6 +279,7 @@ static void client_add_route ( clientmgr_ctx *ctx, struct client *client, struct
 	// TODO: do the ipv4 address extraction in insert_neighbour and adjust the signature to use in6_addr
 	
         struct in_addr ip4 = extractv4_v6(&ip->addr);
+	 log_verbose("adding neighbour and route for IP: %s\n",print_ip4(&ip4));
         routemgr_insert_neighbor4 ( &l3ctx.routemgr_ctx, client->ifindex, &ip4, client->mac );
 
 // 		routemgr_insert_neighbor(&l3ctx.routemgr_ctx, client->ifindex, &ip->addr, client->mac);
@@ -786,3 +788,4 @@ void clientmgr_init()
 {
     post_task ( &l3ctx.taskqueue_ctx, OLDCLIENTS_KEEP_SECONDS, 0, purge_oldclients_task, NULL, NULL );
 }
+
