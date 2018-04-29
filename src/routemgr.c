@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "icmp6.h"
 #include "util.h"
+
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
 
@@ -244,7 +245,6 @@ static void routemgr_initial_neighbours ( routemgr_ctx *ctx, uint8_t family )
     };
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr * ) &req );
 }
-#include "util.h"
 
 void routemgr_init ( routemgr_ctx *ctx )
 {
