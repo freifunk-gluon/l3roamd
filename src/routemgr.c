@@ -244,6 +244,7 @@ static void routemgr_initial_neighbours ( routemgr_ctx *ctx, uint8_t family )
     };
     rtmgr_rtnl_talk ( ctx, ( struct nlmsghdr * ) &req );
 }
+#include "util.h"
 
 void routemgr_init ( routemgr_ctx *ctx )
 {
@@ -270,6 +271,7 @@ void routemgr_init ( routemgr_ctx *ctx )
         printf ( "Activating route for prefix %s/%i on device %s(%i) in main routing-table\n", str, prefix->plen, CTX ( ipmgr )->ifname, if_nametoindex ( CTX ( ipmgr )->ifname ) );
         if ( prefix->isv4 ) {
             struct in_addr ip4  = extractv4_v6 ( &prefix->prefix );
+            printf("ipv4: %s\n",print_ip4(&ip4));
             routemgr_insert_route4 ( ctx, 254, if_nametoindex ( CTX ( ipmgr )->ifname ), &ip4, prefix->plen - 96 );
         } else
             routemgr_insert_route ( ctx, 254, if_nametoindex ( CTX ( ipmgr )->ifname ), ( struct in6_addr* ) ( prefix->prefix.s6_addr ), prefix->plen );

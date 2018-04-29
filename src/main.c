@@ -119,7 +119,11 @@ bool intercom_ready ( const int fd )
 bool reconnect_fd ( int fd )
 {
     del_fd ( l3ctx.efd, fd );
-    close ( fd );
+    char c;
+    while (read(fd, &c , 1 ) > 0 );
+    if (close ( fd ) < 0 )
+	    perror("close");
+    
     if ( fd == l3ctx.routemgr_ctx.fd ) {
         routemgr_init ( &l3ctx.routemgr_ctx );
         add_fd ( l3ctx.efd, l3ctx.routemgr_ctx.fd, EPOLLIN );
