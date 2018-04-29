@@ -28,7 +28,7 @@ int icmp6_init_packet() {
 	fprog.filter = (struct sock_filter *)filter;
 	fprog.len = sizeof filter / sizeof filter[0];
 
-	sock = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IPV6));
+	sock = socket(PF_PACKET, SOCK_DGRAM | SOCK_NONBLOCK, htons(ETH_P_IPV6));
 	if (sock < 0) {
 		perror("Can't create socket(PF_PACKET)");
 	}
@@ -65,7 +65,7 @@ void icmp6_init(icmp6_ctx *ctx) {
 	}
 
 	// send icmp6 unreachable on unreachfd
-	int unreachfd = socket(AF_INET6, SOCK_RAW,IPPROTO_ICMPV6);
+	int unreachfd = socket(AF_INET6, SOCK_RAW | SOCK_NONBLOCK, IPPROTO_ICMPV6);
 	struct icmp6_filter filterv6 = {};
 
 	ICMP6_FILTER_SETBLOCKALL(&filterv6);
@@ -193,7 +193,7 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 		if (ctx->ndp_disabled)
 			return;
 
-		if (rc == -1)
+		if (rc <= 0) 
 			return;
 
 		log_debug("handling icmp6-NDP packet\n");
