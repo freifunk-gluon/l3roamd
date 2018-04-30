@@ -56,27 +56,7 @@
 
 l3ctx_t l3ctx = {};
 
-void add_fd ( int efd, int fd, uint32_t events )
-{
-    struct epoll_event event = {};
-    event.data.fd = fd;
-    event.events = events;
 
-    int s = epoll_ctl ( efd, EPOLL_CTL_ADD, fd, &event );
-    if ( s == -1 ) {
-        perror ( "epoll_ctl (ADD):" );
-        exit_error ( "epoll_ctl" );
-    }
-}
-
-void del_fd ( int efd, int fd )
-{
-    int s = epoll_ctl ( efd, EPOLL_CTL_DEL, fd, NULL );
-    if ( s == -1 ) {
-        perror ( "epoll_ctl (DEL):" );
-        exit_error ( "epoll_ctl" );
-    }
-}
 
 
 void sig_term_handler ( int signum, siginfo_t *info, void *ptr )
@@ -286,17 +266,6 @@ void usage()
     puts ( "add_address <addr> <mac> This will add the ipv6 address to the client represented by <mac>" );
     puts ( "del_address <addr> <mac> This will remove the ipv6 address from the client represented by <mac>" );
     puts ( "probe <addr> <mac>   This will start a neighbour discovery for a neighbour <mac> with address <addr>" );
-}
-
-void interfaces_changed ( int type, const struct ifinfomsg *msg )
-{
-    printf ( "interfaces changed\n" );
-    intercom_update_interfaces ( &l3ctx.intercom_ctx );
-    icmp6_interface_changed ( &l3ctx.icmp6_ctx, type, msg );
-    arp_interface_changed ( &l3ctx.arp_ctx, type, msg );
-    // TODO: re-initialize routemgr-fd
-    // TODO: re-initialize ipmgr-fd
-    // TODO: re-initialize wifistations-fd
 }
 
 

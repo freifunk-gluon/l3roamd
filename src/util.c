@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "l3roamd.h"
 #include "error.h"
+#include <sys/epoll.h>
 
 /* print a human-readable representation of an in6_addr struct to stdout
 ** */
@@ -18,9 +19,11 @@ const char inline *print_ip(const struct in6_addr *addr) {
 }
 
 struct in_addr inline extractv4_v6(const struct in6_addr *src) {
-        struct in_addr ip4 = {
-            .s_addr = src->s6_addr[15] << 24 | src->s6_addr[14] << 16 | src->s6_addr[13] << 8 | src->s6_addr[12]
-        };	
+        struct in_addr tmp = {
+            .s_addr = src->s6_addr[12] << 24 | src->s6_addr[13] << 16 | src->s6_addr[14] << 8 | src->s6_addr[15]
+        };
+	struct in_addr ip4;
+	ip4.s_addr = ntohl(tmp.s_addr);
 	return ip4;
 }
 
@@ -52,4 +55,37 @@ void log_verbose(const char *format, ...) {
   */
 bool inline address_is_ipv4(const struct in6_addr *address) {
 	return prefix_contains(&l3ctx.clientmgr_ctx.v4prefix, address);
+}
+
+void add_fd ( int efd, int fd, uint32_t events )
+{
+    struct epoll_event event = {};
+    event.data.fd = fd;
+    event.events = events;
+
+    int s = epoll_ctl ( efd, EPOLL_CTL_ADD, fd, &event );
+    if ( s == -1 ) {
+        perror ( "epoll_ctl (ADD):" );
+        exit_error ( "epoll_ctl" );
+    }
+}
+
+void del_fd ( int efd, int fd )
+{
+    int s = epoll_ctl ( efd, EPOLL_CTL_DEL, fd, NULL );
+    if ( s == -1 ) {
+        perror ( "epoll_ctl (DEL):" );
+        exit_error ( "epoll_ctl" );
+    }
+}
+
+void interfaces_changed ( int type, const struct ifinfomsg *msg )
+{
+    printf ( "interfaces changed\n" );
+    intercom_update_interfaces ( &l3ctx.intercom_ctx );
+    icmp6_interface_changed ( &l3ctx.icmp6_ctx, type, msg );
+    arp_interface_changed ( &l3ctx.arp_ctx, type, msg );
+    // TODO: re-initialize routemgr-fd
+    // TODO: re-initialize ipmgr-fd
+    // TODO: re-initialize wifistations-fd
 }
