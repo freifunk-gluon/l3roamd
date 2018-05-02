@@ -17,42 +17,42 @@
 
 static inline __u32 rta_getattr_u32(const struct rtattr *rta)
 {
-	return *(__u32 *)RTA_DATA(rta);
+    return *(__u32 *)RTA_DATA(rta);
 }
 
 struct nlrtreq {
-	struct nlmsghdr nl;
-	struct rtmsg rt;
-	char buf[1024];
+    struct nlmsghdr nl;
+    struct rtmsg rt;
+    char buf[1024];
 };
 
 struct nlneighreq {
-	struct nlmsghdr nl;
-	struct ndmsg nd;
-	char buf[1024];
+    struct nlmsghdr nl;
+    struct ndmsg nd;
+    char buf[1024];
 };
 
 struct kernel_route {
-	struct in6_addr prefix;
-	struct in6_addr src_prefix;
-	struct in6_addr gw;
-	int plen;
-	int src_plen; /* no source prefix <=> src_plen == 0 */
-	int metric;
-	int proto;
-	unsigned int ifindex;
-	unsigned int table;
+    struct in6_addr prefix;
+    struct in6_addr src_prefix;
+    struct in6_addr gw;
+    int plen;
+    int src_plen; /* no source prefix <=> src_plen == 0 */
+    int metric;
+    int proto;
+    unsigned int ifindex;
+    unsigned int table;
 };
 
 typedef struct {
-	struct l3ctx *l3ctx;
-	char *clientif;
-	char *client_bridge;
-	int fd;
-	int clientif_index;
-	int client_bridge_index;
-	bool nl_disabled;
-	uint8_t bridge_mac[ETH_ALEN];
+    struct l3ctx *l3ctx;
+    char *clientif;
+    char *client_bridge;
+    int fd;
+    int clientif_index;
+    int client_bridge_index;
+    bool nl_disabled;
+    uint8_t bridge_mac[ETH_ALEN];
 } routemgr_ctx;
 
 void handle_route(routemgr_ctx *ctx, struct kernel_route *route);
