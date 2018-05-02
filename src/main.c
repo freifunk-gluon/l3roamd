@@ -23,8 +23,6 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    */
 
-// TODO EPOLLOUT beim schreiben auf den tunfd
-
 #include "version.h"
 #include "vector.h"
 #include "ipmgr.h"
