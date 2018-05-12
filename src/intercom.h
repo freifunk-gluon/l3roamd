@@ -15,7 +15,7 @@
 #define L3ROAMD_PACKET_FORMAT_VERSION 0 
 #define INFO_MAX 15 // this amount * sizeof(in6_addr) + 6 (mac-address) + 2 (type, lenght) must fit into uint8_t. If we have more than 15 IP addresses for a single client, we could implement sending multiple segments of type INFO_BASIC.
 
-enum {INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO};
+enum {INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO, INTERCOM_ACK};
 enum {INFO_PLAT, INFO_BASIC};
 enum {CLAIM_MAC};
 enum {SEEK_ADDRESS};
@@ -106,3 +106,4 @@ void intercom_add_interface(intercom_ctx *ctx, char *ifname);
 void intercom_update_interfaces(intercom_ctx *ctx);
 void intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished);
 bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client);
+bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client);

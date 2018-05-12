@@ -471,7 +471,7 @@ bool intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet, int p
 		VECTOR_DELETE(ctx->repeatable_claims, i);
 
 	bool acted_on_local_client = clientmgr_handle_info(CTX(clientmgr), &client);
-
+	intercom_ack(ctx, &sender, &client);
 	VECTOR_FREE(client.addresses);
 	return !acted_on_local_client;
 }
@@ -630,6 +630,27 @@ void schedule_claim_retry(struct claim_task *data, int timeout) {
 
 	ndata->retries_left = data->retries_left -1;
 	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, timeout, 0, claim_retry_task, free_claim_task, ndata);
+}
+
+bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
+	char mac_str[18];
+
+	if (l3ctx.debug) {
+		mac_addr_n2a(mac_str, client->mac);
+		printf("sending ACK for client [%s] to %s\n", mac_str, print_ip(recipient));
+	}
+
+	intercom_packet_claim *packet = l3roamd_alloc(sizeof(intercom_packet_hdr) + 8);
+
+	int currentoffset = assemble_header(&packet->hdr, 255, INTERCOM_ACK);
+	currentoffset += assemble_macinfo((void*)(packet) + currentoffset, client->mac, CLAIM_MAC);
+
+	intercom_recently_seen_add(ctx, &packet->hdr);
+
+	intercom_send_packet(ctx, (uint8_t*)packet, currentoffset);
+
+	free(packet);
+	return true;
 }
 
 bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {

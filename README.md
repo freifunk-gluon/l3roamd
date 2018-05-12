@@ -140,7 +140,7 @@ Each packet consists of a common header structure:
 ```
 VERSION - this is the version of the protocol. Meant to allow compatibility of multiple versions of l3roamd.  
 TTL     - this is decremented whenever a multicast-packet is forwarded.  
-type    - this is the packet-type, one of INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO.  
+type    - this is the packet-type, one of INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO, INTERCOM_ACK.  
 nonce   - this is a random number that is used to identify duplicate packets and drop them.  
 sender  - ipv6-address of the sender of the packet.  
 
@@ -268,6 +268,28 @@ MAC is the mac-address of the client
 addr1-addr# are 1-n ipv6 addresses.  
 plat is the plat-prefix used by this client.  
 lease is the remaining lease time of the clients ipv4 address in seconds.  
+
+### ACK
+This packet is sent in reply of an INFO packet. Upon reception the retry-cycle for sending INFO packets for the client identified by the MAC is aborted.
+
+0        7        15       23       31
++-----------------------------------+
+| VERSION|  TTL   |  type  | empty  |
++--------+--------+--------+--------+
+| nonce1 | nonce2 | nonce3 | nonce4 |
++--------+--------+--------+--------+
+|sender1 |sender2 |sender3 |sender4 |
++--------+--------+--------+--------+
+|sender5 |sender6 |sender7 |sender8 |
++--------+--------+--------+--------+
+|sender9 |sender10|sender11|sender12|
++--------+--------+--------+--------+
+|sender13|sender14|sender15|sender16|
++--------+--------+--------+--------+ --- header ends here.
+|  type  | length |  MAC1  |  MAC2  | type for MAC: 0x00
++--------+--------+--------+--------+
+|  MAC3  |  MAC4  |  MAC5  |  MAC6  |
++-----------------------------------+
 
 ---
   
