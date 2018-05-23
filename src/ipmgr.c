@@ -24,7 +24,7 @@ static void seek_task ( void *d );
 static void ipmgr_purge_task ( void *d );
 
 
-static int entry_compare ( const struct unknown_address *a, const struct unknown_address *b )
+static int entry_compare_by_address ( const struct unknown_address *a, const struct unknown_address *b )
 {
     return memcmp ( &a->address, &b->address, sizeof ( struct in6_addr ) );
 }
@@ -34,7 +34,7 @@ static int entry_compare ( const struct unknown_address *a, const struct unknown
 struct unknown_address *find_entry ( ipmgr_ctx *ctx, const struct in6_addr *k, int *elementindex )
 {
     struct unknown_address key = { .address = *k};
-    struct unknown_address *ret = VECTOR_LSEARCH ( &key, ctx->addrs, entry_compare );
+    struct unknown_address *ret = VECTOR_LSEARCH ( &key, ctx->addrs, entry_compare_by_address );
     if ( ret != NULL && elementindex != NULL )
         *elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( ctx->addrs, 0 ) ) / sizeof ( struct unknown_address );
     log_debug ( "%s is on the unknown-clients list", print_ip ( k ) );
