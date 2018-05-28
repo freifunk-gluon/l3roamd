@@ -208,7 +208,7 @@ void add_special_ip ( clientmgr_ctx *ctx, struct client *client )
 **/
 void close_client_fd ( int *fd )
 {
-    log_debug ( "closing client fd %i\n", fd );
+    log_debug ( "closing client fd %i\n", *fd );
 
     if ( *fd>0 ) {
         del_fd ( l3ctx.efd, *fd );
@@ -737,11 +737,8 @@ bool clientmgr_handle_claim ( clientmgr_ctx *ctx, const struct in6_addr *sender,
     if ( client == NULL )
         return false;
 
-//	bool active = client_is_active(client);
-
     intercom_info ( CTX ( intercom ), sender, client, true );
-//	if (active)
-//		return;
+
     if ( !old ) {
         printf ( "Dropping client %02x:%02x:%02x:%02x:%02x:%02x in response to claim from sender %s\n",  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], print_ip ( sender ) );
         clientmgr_delete_client ( ctx, client->mac );
