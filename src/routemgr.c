@@ -583,7 +583,7 @@ void routemgr_remove_route ( routemgr_ctx *ctx, const int table, struct in6_addr
         .rt = {
             .rtm_family = AF_INET6,
             .rtm_table = table,
-            .rtm_dst_len = 128
+            .rtm_dst_len = prefix_length
         }
     };
 
