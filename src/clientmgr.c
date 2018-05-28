@@ -787,3 +787,7 @@ void clientmgr_init()
     post_task ( &l3ctx.taskqueue_ctx, OLDCLIENTS_KEEP_SECONDS, 0, purge_oldclients_task, NULL, NULL );
 }
 
+int client_compare_by_mac ( const struct client *a, const struct client *b )
+{
+    return memcmp ( &a->mac, &b->mac, ETH_ALEN);
+}

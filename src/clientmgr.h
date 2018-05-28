@@ -73,3 +73,4 @@ void clientmgr_init();
 bool client_is_active(const struct client *client);
 bool ip_is_active(const struct client_ip *ip);
 
+int client_compare_by_mac ( const client_t *a, const client_t *b );
