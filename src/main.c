@@ -425,6 +425,7 @@ int main ( int argc, char *argv[] )
             break;
         case 'd':
             l3ctx.debug = true;
+	    /* Falls through. */
         case 'v':
             l3ctx.verbose = true;
             break;

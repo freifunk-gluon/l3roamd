@@ -396,6 +396,7 @@ void routemgr_handle_in ( routemgr_ctx *ctx, int fd )
                 ne = NLMSG_DATA ( nh );
                 if ( ne->error <= 0 )
                     continue;
+		/* Falls through. */
             default:
                 rtnl_handle_msg ( ctx, nh );
             }
