@@ -94,19 +94,21 @@ void rtnl_handle_neighbour ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
         }
     } else if ( msg->ndm_state & NUD_FAILED ) {
         if ( nh->nlmsg_type == RTM_NEWNEIGH ) { // TODO: re-try sending NS if no NA is received
-            log_debug ( "NEWNEIGH & NUD_FAILED received - sending NS for ip %s [%s]\n", ip_str, mac_str );
+	    if (clientmgr_valid_address(&l3ctx.clientmgr_ctx, &dst_address)) {
+                log_debug ( "NEWNEIGH & NUD_FAILED received - sending NS for ip %s [%s]\n", ip_str, mac_str );
 
-            // we cannot directly use probe here because
-            // that would lead to an endless loop.
-            // TODO: let the kernel do the probing and
-            // remember how often we where in this state
-            // for each client. If that was >3 times,
-            // remove client.
-            if ( msg->ndm_family == AF_INET ) {
-                arp_send_request ( CTX ( arp ), &dst_address );
-            } else {
-                icmp6_send_solicitation ( CTX ( icmp6 ), &dst_address );
-            }
+                // we cannot directly use probe here because
+                // that would lead to an endless loop.
+                // TODO: let the kernel do the probing and
+                // remember how often we where in this state
+                // for each client. If that was >3 times,
+                // remove client.
+                if ( msg->ndm_family == AF_INET ) {
+                    arp_send_request ( CTX ( arp ), &dst_address );
+                } else {
+                    icmp6_send_solicitation ( CTX ( icmp6 ), &dst_address );
+                }
+	    }
         } else if ( nh->nlmsg_type == RTM_DELNEIGH ) {
             log_debug ( "REMOVING (DELNEIGH) %s [%s]\n", ip_str, mac_str );
             rtmgr_client_remove_address ( &dst_address );
