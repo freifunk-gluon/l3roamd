@@ -227,7 +227,9 @@ void remove_special_ip ( clientmgr_ctx *ctx, struct client *client )
     struct in6_addr address = mac2ipv6 ( client->mac, &ctx->node_client_prefix );
     printf ( "Removing special address: %s\n", print_ip ( &address ) );
     close_client_fd ( &client->fd );
+    routemgr_remove_route ( CTX ( routemgr ), ctx->export_table, &address, 128 );
     rtnl_remove_address ( CTX ( routemgr ), &address );
+    // remove route
     client->node_ip_initialized = false;
 }
 
