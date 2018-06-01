@@ -15,10 +15,11 @@
 #define L3ROAMD_PACKET_FORMAT_VERSION 0 
 #define INFO_MAX 15 // this amount * sizeof(in6_addr) + 6 (mac-address) + 2 (type, lenght) must fit into uint8_t. If we have more than 15 IP addresses for a single client, we could implement sending multiple segments of type INFO_BASIC.
 
-enum {INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO, INTERCOM_ACK};
-enum {INFO_PLAT, INFO_BASIC};
-enum {CLAIM_MAC};
-enum {SEEK_ADDRESS};
+enum { INTERCOM_SEEK, INTERCOM_CLAIM, INTERCOM_INFO, INTERCOM_ACK };
+enum { INFO_PLAT, INFO_BASIC };
+enum { CLAIM_MAC };
+enum { ACK_MAC };
+enum { SEEK_ADDRESS };
 
 typedef struct __attribute__((__packed__)) {
 	uint8_t version;
@@ -41,6 +42,11 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct __attribute__((__packed__)) {
 	intercom_packet_hdr hdr;
+	// after this a dynamic buffer is appended to hold TLV. currently just mac address is allowed
+} intercom_packet_ack;
+
+typedef struct __attribute__((__packed__)) {
+	intercom_packet_hdr hdr;
 	// after this a dynamic buffer is appended for plat info and basic client info
 } intercom_packet_info;
 
@@ -53,7 +59,9 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct {
 	uint8_t mac[ETH_ALEN];
-} claim;
+} mac;
+
+typedef  VECTOR(client_t) client_v;
 
 typedef struct __attribute__((__packed__)) {
 	uint8_t type;
@@ -73,10 +81,10 @@ typedef struct {
 	bool ok;
 } intercom_if;
 
-struct claim_task {
+struct intercom_task {
 	uint16_t packet_len;
 	struct client *client;
-	intercom_packet_claim *packet;
+	uint8_t *packet;
 	struct in6_addr *recipient;
 	taskqueue_t *check_task;
 	uint8_t retries_left;
@@ -89,7 +97,8 @@ typedef struct {
 	struct l3ctx *l3ctx;
 	VECTOR(intercom_packet_hdr) recent_packets;
 	VECTOR(intercom_if) interfaces;
-	VECTOR(client_t) repeatable_claims;
+	client_v repeatable_claims;
+	client_v repeatable_infos;
 	int unicast_nodeip_fd;
 	int mtu;
 } intercom_ctx;
@@ -104,6 +113,6 @@ void intercom_init(intercom_ctx *ctx);
 void intercom_handle_in(intercom_ctx *ctx, int fd);
 void intercom_add_interface(intercom_ctx *ctx, char *ifname);
 void intercom_update_interfaces(intercom_ctx *ctx);
-void intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished);
+bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished);
 bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client);
 bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client);
