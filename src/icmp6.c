@@ -13,6 +13,7 @@
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
 #include <linux/filter.h>
+#include <unistd.h>
 
 int icmp6_init_packet() {
 	int sock, err;
@@ -201,8 +202,10 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 		uint8_t *mac = lladdr.sll_addr;
 
 		if (packet.sol.hdr.nd_ns_hdr.icmp6_type == ND_NEIGHBOR_SOLICIT) {
-			if (memcmp(&packet.hdr.ip6_src, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16) == 0)
+			if (memcmp(&packet.hdr.ip6_src, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16) == 0) {
+				// client is doing DAD. We could trigger sending NS on this IP address for a couple of times in a while to learn its address instead of flooding the network. If we do this, what effects will this have on privacy extensions?
 				continue;
+			}
 
 			if (l3ctx.debug) {
 				char str[INET6_ADDRSTRLEN];
@@ -259,14 +262,12 @@ void icmp6_handle_in(icmp6_ctx *ctx, int fd) {
 		if (memcmp(packet.hw_addr, "\x00\x00\x00\x00\x00\x00", 6) == 0)
 			continue;
 
-		if (l3ctx.debug) {
-			printf("Learning from Neighbour Advertisement that Client [%02x:%02x:%02x:%02x:%02x:%02x] is active on ip %s\n",  packet.hw_addr[0], packet.hw_addr[1], packet.hw_addr[2], packet.hw_addr[3], packet.hw_addr[4], packet.hw_addr[5], print_ip(&packet.hdr.nd_na_target));
-		}
+		log_debug("Learning from Neighbour Advertisement that Client [%02x:%02x:%02x:%02x:%02x:%02x] is active on ip %s\n",  packet.hw_addr[0], packet.hw_addr[1], packet.hw_addr[2], packet.hw_addr[3], packet.hw_addr[4], packet.hw_addr[5], print_ip(&packet.hdr.nd_na_target));
 
 		clientmgr_add_address(CTX(clientmgr), &packet.hdr.nd_na_target, packet.hw_addr, ctx->ifindex);
 	}
 }
-#include <unistd.h>
+
 void icmp6_send_dest_unreachable(const struct in6_addr *addr, const struct packet *data) {
 	struct dest_unreach_packet packet = {};
 	memset(&packet, 0, sizeof(packet));

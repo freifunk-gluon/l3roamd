@@ -720,9 +720,9 @@ void schedule_claim_retry(struct intercom_task *data, int timeout) {
 }
 
 bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
-	char mac_str[18];
 
 	if (l3ctx.debug) {
+		char mac_str[18];
 		mac_addr_n2a(mac_str, client->mac);
 		printf("sending ACK for client [%s] to %s\n", mac_str, print_ip(recipient));
 	}
@@ -734,7 +734,7 @@ bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct cl
 
 //	intercom_recently_seen_add(ctx, &packet->hdr);
 
-	intercom_send_packet(ctx, (uint8_t*)packet, currentoffset);
+	intercom_send_packet_unicast(ctx, recipient, (uint8_t*)packet, currentoffset);
 
 	free(packet);
 	return true;
