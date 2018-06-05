@@ -40,7 +40,7 @@ void taskqueue_init(taskqueue_ctx *ctx) {
 }
 
 /** Enqueues a new task. A task with a timeout of zero is scheduled immediately. */
-taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, int millisecs, void (*function)(void*), void (*cleanup)(void*), void *data) {
+taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, unsigned int millisecs, void (*function)(void*), void (*cleanup)(void*), void *data) {
 	taskqueue_t *task = l3roamd_alloc(sizeof(taskqueue_t));
 	task->children = task->next = NULL;
 	task->pprev = NULL;
@@ -48,7 +48,7 @@ taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, int millisecs,
 	clock_gettime(CLOCK_MONOTONIC, &task->due);
 
 	task->due.tv_sec += timeout;
-	task->due.tv_nsec += millisecs*1000;
+	task->due.tv_nsec += millisecs*1000l;
 	task->function = function;
 	task->cleanup = cleanup;
 	task->data = data;
@@ -61,13 +61,14 @@ taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, int millisecs,
 
 /** Changes the timeout of a task.
   */
-bool reschedule_task(taskqueue_ctx *ctx, taskqueue_t *task, unsigned int timeout) {
+bool reschedule_task(taskqueue_ctx *ctx, taskqueue_t *task, unsigned int timeout, unsigned int millisecs) {
 	if (task == NULL || !taskqueue_linked(task))
 		return false;
 
 	struct timespec due;
 	clock_gettime(CLOCK_MONOTONIC, &due);
 	due.tv_sec += timeout;
+	due.tv_nsec += millisecs*1000l;
 
 	if (timespec_cmp(due, task->due)) {
 		task->due = due;
