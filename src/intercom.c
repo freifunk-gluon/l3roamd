@@ -607,7 +607,7 @@ void info_retry_task(void *d) {
 	if (data->retries_left > 0)
 		schedule_info_retry(data, 500);
 	else {
-		// we have not received an ACL message, otherwise we would not have run out of retries => likely packet loss. At some point in time, retries need to stop.
+		// we have not received an ACK message, otherwise we would not have run out of retries => likely packet loss. At some point in time, retries need to stop.
 		VECTOR_DELETE(l3ctx.intercom_ctx.repeatable_infos, repeatable_info_index);
 	}
 }
