@@ -39,20 +39,31 @@ void taskqueue_init(taskqueue_ctx *ctx) {
 	ctx->queue = NULL;
 }
 
+/** this will add timeout seconds and millisecs milliseconds to the current time to calculate at which time a task should run given an offset */
+struct timespec settime(unsigned int timeout, unsigned int millisecs) {
+	struct timespec due;
+	clock_gettime(CLOCK_MONOTONIC, &due);
+
+	struct timespec t = {
+		.tv_sec = timeout,
+		.tv_nsec = millisecs * 1000000l
+	};
+
+	return timeAdd(&due, &t);
+}
+
 /** Enqueues a new task. A task with a timeout of zero is scheduled immediately. */
 taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, unsigned int millisecs, void (*function)(void*), void (*cleanup)(void*), void *data) {
 	taskqueue_t *task = l3roamd_alloc(sizeof(taskqueue_t));
 	task->children = task->next = NULL;
 	task->pprev = NULL;
 
-	clock_gettime(CLOCK_MONOTONIC, &task->due);
+	task->due = settime(timeout, millisecs);
 
-	task->due.tv_sec += timeout;
-	task->due.tv_nsec += millisecs*1000l;
 	task->function = function;
 	task->cleanup = cleanup;
 	task->data = data;
-
+	printf("scheduling task %li %li\n", task->due.tv_sec, task->due.tv_nsec);
 	taskqueue_insert(&ctx->queue, task);
 	taskqueue_schedule(ctx);
 
@@ -65,10 +76,7 @@ bool reschedule_task(taskqueue_ctx *ctx, taskqueue_t *task, unsigned int timeout
 	if (task == NULL || !taskqueue_linked(task))
 		return false;
 
-	struct timespec due;
-	clock_gettime(CLOCK_MONOTONIC, &due);
-	due.tv_sec += timeout;
-	due.tv_nsec += millisecs*1000l;
+	struct timespec due = settime(timeout, millisecs);
 
 	if (timespec_cmp(due, task->due)) {
 		task->due = due;
