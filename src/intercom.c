@@ -420,7 +420,7 @@ bool intercom_handle_claim(intercom_ctx *ctx, intercom_packet_claim *packet, int
 
 
 /* find an entry in a vector containing elements of type client_t */
-struct client *find_repeatable (void *v, const uint8_t *k, int *elementindex )
+struct client *find_repeatable (void *v, client_t *k, int *elementindex )
 {
 	client_v vec = *(client_v*)v;
 
@@ -432,7 +432,7 @@ struct client *find_repeatable (void *v, const uint8_t *k, int *elementindex )
 
 	if (l3ctx.debug) {
 		char str_mac[18];
-		mac_addr_n2a(str_mac, k);
+		mac_addr_n2a(str_mac, k->mac);
 		printf( "match on vector for mac %s", str_mac);
 	}
 
@@ -447,7 +447,7 @@ struct client *find_repeatable (void *v, const uint8_t *k, int *elementindex )
 
 
 bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int packet_len) {
-	mac client = {};
+	mac client_mac = {};
 	uint8_t type, *packetpointer;
 	int currentoffset = sizeof(intercom_packet_info);
 
@@ -457,7 +457,7 @@ bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int pac
 		log_debug("offset: %i packet starts at: %p, packetpointer: %p\n", currentoffset, packet, packetpointer);
 		switch (type) {
 			case ACK_MAC:
-				currentoffset += parse_mac((uint8_t*)packetpointer, &client);
+				currentoffset += parse_mac((uint8_t*)packetpointer, &client_mac);
 				break;
 			default:
 				printf("unknown segment of type %i found in ack packet. ignoring this piece\n", type);
@@ -467,12 +467,15 @@ bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int pac
 
 	if (l3ctx.debug) {
 		char str_mac[18];
-		mac_addr_n2a(str_mac, client.mac);
+		mac_addr_n2a(str_mac, client_mac.mac);
 		printf("handling ACK packet for Client with mac %s\n", str_mac);
 	}
 
 	int i = 0;
-	if (find_repeatable(&ctx->repeatable_infos, client.mac, &i))
+	client_t c = {};
+	memcpy(c.mac, client_mac.mac, ETH_ALEN);
+
+	if (find_repeatable(&ctx->repeatable_infos, &c, &i))
 		VECTOR_DELETE(ctx->repeatable_infos, i);
 
 	return false; // never forward acks
@@ -507,8 +510,8 @@ bool intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet, int p
 		}
 	}
 
-	int i = 0;
-	if (find_repeatable(&ctx->repeatable_claims, client.mac, &i))
+	int i = -1;
+	if (find_repeatable(&ctx->repeatable_claims, &client, &i))
 		VECTOR_DELETE(ctx->repeatable_claims, i);
 
 	bool acted_on_local_client = clientmgr_handle_info(CTX(clientmgr), &client);
@@ -587,7 +590,7 @@ void info_retry_task(void *d) {
 	struct intercom_task *data = d;
 
 	int repeatable_info_index;
-	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_infos, data->client->mac, &repeatable_info_index))
+	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_infos, data->client, &repeatable_info_index))
 		return;
 
 	char str_mac[18];
@@ -614,7 +617,7 @@ void info_retry_task(void *d) {
 
 bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished) {
 	int i;
-	if (find_repeatable(&ctx->repeatable_infos, client->mac, &i))
+	if (find_repeatable(&ctx->repeatable_infos, client, &i))
 		return true;
 	else {
 		if (l3ctx.debug) {
@@ -657,7 +660,7 @@ void claim_retry_task(void *d) {
 	struct intercom_task *data = d;
 
 	int repeatable_claim_index;
-	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client->mac, &repeatable_claim_index))
+	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index))
 		return;
 
 	if (data->recipient != NULL) {
@@ -708,7 +711,7 @@ void schedule_info_retry(struct intercom_task *data, int ms_timeout) {
 	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, info_retry_task, free_intercom_task, ndata);
 }
 
-void schedule_claim_retry(struct intercom_task *data, int timeout) {
+void schedule_claim_retry(struct intercom_task *data, int ms_timeout) {
 	if (data->retries_left == 0)
 		return;
 
@@ -716,7 +719,7 @@ void schedule_claim_retry(struct intercom_task *data, int timeout) {
 	copy_intercom_task(data, ndata);
 	ndata->retries_left--;
 
-	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, timeout, claim_retry_task, free_intercom_task, ndata);
+	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, claim_retry_task, free_intercom_task, ndata);
 }
 
 bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
@@ -743,7 +746,7 @@ bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct cl
 bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
 	int i;
 
-	if (find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, client->mac, &i))
+	if (find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, client, &i))
 		return true;
 	else {
 		if (l3ctx.debug) {

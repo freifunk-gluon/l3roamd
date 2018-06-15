@@ -1,6 +1,7 @@
 /*
   Copyright (c) 2012-2016, Matthias Schiffer <mschiffer@universe-factory.net>
   Copyright (c) 2016, Nils Schneider <nils@nilsschneider.net>
+  Copyright (c) 2017-2018, Christof Schulze <christof.schulze@gmx.net>
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -63,7 +64,6 @@ taskqueue_t * post_task(taskqueue_ctx *ctx, unsigned int timeout, unsigned int m
 	task->function = function;
 	task->cleanup = cleanup;
 	task->data = data;
-	printf("scheduling task %li %li\n", task->due.tv_sec, task->due.tv_nsec);
 	taskqueue_insert(&ctx->queue, task);
 	taskqueue_schedule(ctx);
 
