@@ -307,7 +307,7 @@ bool intercom_recently_seen(intercom_ctx *ctx, intercom_packet_hdr *hdr) {
 }
 
 void intercom_recently_seen_add(intercom_ctx *ctx, intercom_packet_hdr *hdr) {
-	if (VECTOR_LEN(ctx->recent_packets) > INTERCOM_MAX_RECENT)
+	while (VECTOR_LEN(ctx->recent_packets) > INTERCOM_MAX_RECENT)
 		VECTOR_DELETE(ctx->recent_packets, 0);
 
 	VECTOR_ADD(ctx->recent_packets, *hdr);
@@ -425,7 +425,7 @@ struct client *find_repeatable (void *v, client_t *k, int *elementindex )
 	client_v vec = *(client_v*)v;
 
 	client_t key = { };
-	memcpy(key.mac, k, ETH_ALEN);
+	memcpy(key.mac, k->mac, ETH_ALEN);
 
 	// TODO: replace this with VECTOR_BSEARCH
 	struct client *ret = (struct client*)VECTOR_LSEARCH ( &key, vec, client_compare_by_mac );
@@ -433,7 +433,7 @@ struct client *find_repeatable (void *v, client_t *k, int *elementindex )
 	if (l3ctx.debug) {
 		char str_mac[18];
 		mac_addr_n2a(str_mac, k->mac);
-		printf( "match on vector for mac %s", str_mac);
+		log_debug( "match on vector for mac %s", str_mac);
 	}
 
 	if ( ret != NULL && elementindex != NULL ) {
@@ -623,7 +623,7 @@ bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct c
 		if (l3ctx.debug) {
 			char mac_str[18];
 			mac_addr_n2a(mac_str, client->mac);
-			printf("Assembling INFO for client [%s]\n", mac_str);
+			log_debug("Assembling INFO for client [%s]\n", mac_str);
 		}
 	}
 
@@ -635,7 +635,7 @@ bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct c
 	data->packet_len += assemble_platinfo(data->packet + data->packet_len);
 	data->packet_len += assemble_basicinfo(data->packet + data->packet_len, client);
 
-	log_debug("current offset: %i\n", data->packet_len);
+	// log_debug("current offset: %i\n", data->packet_len);
 
 	VECTOR_ADD(ctx->repeatable_infos, *client);
 
@@ -660,8 +660,11 @@ void claim_retry_task(void *d) {
 	struct intercom_task *data = d;
 
 	int repeatable_claim_index;
-	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index))
+	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index)) {
+		log_verbose("could not find repeatable claim for client, returning.\n");
+		print_client(data->client);
 		return;
+	}
 
 	if (data->recipient != NULL) {
 		log_debug("sending unicast claim for client %02x:%02x:%02x:%02x:%02x:%02x to %s\n",  data->client->mac[0], data->client->mac[1], data->client->mac[2], data->client->mac[3], data->client->mac[4], data->client->mac[5], print_ip(data->recipient));
@@ -749,10 +752,10 @@ bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct 
 	if (find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, client, &i))
 		return true;
 	else {
-		if (l3ctx.debug) {
+		if (l3ctx.verbose) {
 			char mac_str[18];
 			mac_addr_n2a(mac_str, client->mac);
-			printf("CLAIMING client [%s]\n", mac_str);
+			log_verbose("CLAIMING client [%s]\n", mac_str);
 		}
 	}
 
