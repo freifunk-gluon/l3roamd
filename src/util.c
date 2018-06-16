@@ -33,6 +33,14 @@ void inline mapv4_v6(const struct in_addr *src, struct in6_addr *dst) {
 }
 
 
+
+void log_error(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+}
+
 void log_debug(const char *format, ...) {
 	if (!l3ctx.debug)
 		return;
