@@ -304,13 +304,13 @@ void ipmgr_handle_out ( ipmgr_ctx *ctx, int fd )
                 then.tv_sec -= PACKET_TIMEOUT;
                 perror ( "Could not send packet to newly visible client." );
                 if ( timespec_cmp ( packet->timestamp, then ) <= 0 ) {
-                    printf ( "packet is still young enough, requeueing\n" );
+                    log_error ( "could not send packet - packet is still young enough, requeueing\n" );
                     // TODO: consider if output_queue
                     // really is the correct queue when
                     // requeueing
                     VECTOR_ADD ( ctx->output_queue, *packet );
                 } else {
-                    printf ( "packet is too old, discarding.\n" );
+                    log_error ( "could not send packet - packet is too old, discarding.\n" );
                 }
             }
 
@@ -328,7 +328,7 @@ void ipmgr_route_appeared ( ipmgr_ctx *ctx, const struct in6_addr *destination )
     struct unknown_address *e = find_entry ( ctx, destination, NULL );
 
     if ( !e ) {
-        log_debug ( "route appeared for a client that we do not know: %s\n", print_ip ( destination ) );
+//        log_debug ( "route appeared for client %s, which is not on the unknown-list.\n", print_ip ( destination ) );
         return;
     }
 

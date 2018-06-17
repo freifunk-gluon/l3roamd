@@ -232,7 +232,7 @@ uint8_t assemble_basicinfo(uint8_t *packet, struct client *client) {
 	}
 
 	if (l3ctx.debug) {
-		printf("added %i addresses to info packet for client ", num_addresses);
+		log_debug("added %i addresses to info packet for client ", num_addresses);
 		print_client(client);
 	}
 
@@ -274,7 +274,7 @@ bool intercom_send_packet_unicast(intercom_ctx *ctx, const struct in6_addr *reci
 void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len) {
 	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
 		intercom_if *iface = &VECTOR_INDEX(ctx->interfaces, i);
-		//		int fd = VECTOR_INDEX(ctx->interfaces, i).mcast_send_fd ;
+		// int fd = VECTOR_INDEX(ctx->interfaces, i).mcast_send_fd ;
 		int fd = ctx->unicast_nodeip_fd;
 
 		if (!iface->ok)
@@ -286,11 +286,7 @@ void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len
 		_groupaddr.sin6_scope_id = iface->ifindex;
 
 		ssize_t rc = sendto(fd, packet, packet_len, 0, (struct sockaddr*)&_groupaddr, sizeof(struct sockaddr_in6));
-		if (l3ctx.debug) {
-			char str[INET6_ADDRSTRLEN+1];
-			inet_ntop(AF_INET6, &_groupaddr.sin6_addr, str, INET6_ADDRSTRLEN);
-			printf("sent intercom packet to %s on iface %s rc: %zi\n",str , iface->ifname,rc);
-		}
+		log_debug("sent intercom packet to %s on iface %s rc: %zi\n",print_ip(&_groupaddr.sin6_addr) , iface->ifname,rc);
 		if (rc < 0)
 			iface->ok = false;
 	}
@@ -320,15 +316,13 @@ int parse_address(const uint8_t *packet, struct in6_addr *address) {
 }
 
 int parse_mac(const uint8_t *packet, mac *claim) {
-	if (l3ctx.debug)
-		printf("parsing packet segment: mac\n");
+	log_debug("parsing packet segment: mac\n");
 	memcpy(claim->mac, &packet[2],6);
 	return packet[1];
 }
 
 int parse_plat(const uint8_t *packet, struct client *client) {
-	if (l3ctx.debug)
-		printf("parsing info packet plat\n");
+	log_debug("parsing info packet plat\n");
 	memcpy(&l3ctx.clientmgr_ctx.platprefix, &packet[4], 16);
 	return packet[1];
 }
@@ -339,7 +333,7 @@ int parse_basic(const uint8_t *packet,  struct client *client) {
 	int num_addresses = (length - 2 - 6) / 16;
 
 	if (l3ctx.debug) {
-		printf("handling info segment with %i addresses for client ", num_addresses);
+		log_verbose("handling info segment with %i addresses for client ", num_addresses);
 		print_client(client);
 	}
 
@@ -381,7 +375,7 @@ bool intercom_handle_seek(intercom_ctx *ctx, intercom_packet_seek *packet, int p
 					icmp6_send_solicitation(CTX(icmp6), &address);
 				break;
 			default:
-				printf("unknown segment of type %i found in info packet. ignoring this piece\n", type);
+				log_error("unknown segment of type %i found in info packet. ignoring this piece\n", type);
 				break;
 
 		}
@@ -397,19 +391,25 @@ bool intercom_handle_claim(intercom_ctx *ctx, intercom_packet_claim *packet, int
 
 	mac claim = { };
 	memcpy(&sender.s6_addr, &packet->hdr.sender, sizeof(uint8_t) * 16);
-	printf("handling claim from: %s\n", print_ip(&sender));
+
+	if (!memcmp(sender.s6_addr, ctx->ip, 16)) {
+		log_verbose("discarding claim from own node\n");
+		return false; // this makes the assumption that this packet was unicast. Claims should be unicast.
+	}
+
+	log_verbose("handling claim from: %s\n", print_ip(&sender));
 
 	while (currentoffset < packet_len) {
 		packetpointer = &((uint8_t*)packet)[currentoffset];
 		type = *packetpointer;
 		if (l3ctx.debug)
-			printf("offset: %i %p %p\n", currentoffset, packet ,packetpointer);
+			log_debug("offset: %i %p %p\n", currentoffset, packet ,packetpointer);
 		switch (type) {
 			case CLAIM_MAC:
 				currentoffset += parse_mac(packetpointer, &claim);
 				break;
 			default:
-				printf("unknown segment of type %i found in info packet. ignoring this piece\n", type);
+				log_error("unknown segment of type %i found in info packet. ignoring this piece\n", type);
 				break;
 
 		}
@@ -460,7 +460,7 @@ bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int pac
 				currentoffset += parse_mac((uint8_t*)packetpointer, &client_mac);
 				break;
 			default:
-				printf("unknown segment of type %i found in ack packet. ignoring this piece\n", type);
+				log_error("unknown segment of type %i found in ack packet. ignoring this piece\n", type);
 				break;
 		}
 	}
@@ -468,7 +468,7 @@ bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int pac
 	if (l3ctx.debug) {
 		char str_mac[18];
 		mac_addr_n2a(str_mac, client_mac.mac);
-		printf("handling ACK packet for Client with mac %s\n", str_mac);
+		log_verbose("handling ACK packet for Client with mac %s\n", str_mac);
 	}
 
 	int i = 0;
@@ -504,7 +504,7 @@ bool intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet, int p
 				currentoffset += parse_basic(packetpointer, &client);
 				break;
 			default:
-				printf("unknown segment of type %i found in info packet. ignoring this piece\n", type);
+				log_error("unknown segment of type %i found in info packet. ignoring this piece\n", type);
 				break;
 
 		}
@@ -549,7 +549,7 @@ void intercom_handle_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_l
 	else {
 		// if the packet version is unknown we cannot decrement ttl because we do not know where it is in the packet. Also the check whether we have already seen it fails.
 		// all we can do is self-preservation and not crash and forward. However if we forward while having no already_seen_checks we will break the network. => dropping the packet.
-		printf("unknown packet with version %i received on intercom. Ignoring content and dropping the packet that could have originated from: %s or %s. We are guessing here because the format may have shifted.\n ", hdr->version, print_ip((void*)&packet[6]), print_ip((void*)hdr->sender));
+		log_error("unknown packet with version %i received on intercom. Ignoring content and dropping the packet that could have originated from: %s or %s. This is a guess with current or previous positions of the originator\n", hdr->version, print_ip((void*)&packet[6]), print_ip((void*)hdr->sender));
 	}
 }
 
@@ -658,6 +658,7 @@ bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct c
 
 void claim_retry_task(void *d) {
 	struct intercom_task *data = d;
+	bool unicast_packet_sent = true;
 
 	int repeatable_claim_index;
 	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index)) {
@@ -668,17 +669,20 @@ void claim_retry_task(void *d) {
 
 	if (data->recipient != NULL) {
 		log_debug("sending unicast claim for client %02x:%02x:%02x:%02x:%02x:%02x to %s\n",  data->client->mac[0], data->client->mac[1], data->client->mac[2], data->client->mac[3], data->client->mac[4], data->client->mac[5], print_ip(data->recipient));
-		intercom_send_packet_unicast(&l3ctx.intercom_ctx, data->recipient, (uint8_t*)data->packet, data->packet_len);
+		unicast_packet_sent = intercom_send_packet_unicast(&l3ctx.intercom_ctx, data->recipient, (uint8_t*)data->packet, data->packet_len);
 	} else {
 		log_debug("sending multicast claim for client %02x:%02x:%02x:%02x:%02x:%02x\n",  data->client->mac[0], data->client->mac[1], data->client->mac[2], data->client->mac[3], data->client->mac[4], data->client->mac[5]);
 		intercom_recently_seen_add(&l3ctx.intercom_ctx, &((intercom_packet_claim*)data->packet)->hdr);
 		intercom_send_packet(&l3ctx.intercom_ctx, (uint8_t*)&data->packet, data->packet_len);
 	}
 
-	if (data->retries_left > 0)
+	if (data->retries_left > 0 && unicast_packet_sent)
 		schedule_claim_retry(data, 300);
 	else {
-		// we have not received an info message, otherwise we would not have run out of retries => noone knew the client and it is new to the mesh.
+		// we have not received an info message or sending a unicast claim was not successful
+		// the only valid business reason for this to happens is when there is no route to the client, so it must be new to the network
+		// TODO: what about EINTR EWOULDBLOCK ENOBUFS ENOMEM
+		// => noone knew the client and it is new to the mesh.
 		// => adding the special IP
 		VECTOR_DELETE(l3ctx.intercom_ctx.repeatable_claims, repeatable_claim_index);
 		add_special_ip(&l3ctx.clientmgr_ctx, get_client(data->client->mac));
@@ -730,7 +734,7 @@ bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct cl
 	if (l3ctx.debug) {
 		char mac_str[18];
 		mac_addr_n2a(mac_str, client->mac);
-		printf("sending ACK for client [%s] to %s\n", mac_str, print_ip(recipient));
+		log_verbose("sending ACK for client [%s] to %s\n", mac_str, print_ip(recipient));
 	}
 
 	intercom_packet_claim *packet = l3roamd_alloc(sizeof(intercom_packet_ack) + 8);
