@@ -119,7 +119,7 @@ void print_client ( struct client *client )
 				printf ( "  %s %s (tries left: %d)\n", state_str ( addr->state ), str, addr->tentative_retries_left );
 				break;
 			default:
-				exit_error ( "Invalid IP state - exiting due to memory corruption" );
+				exit_bug ( "Invalid IP state %i- exiting due to memory corruption", addr->state );
 		}
 	}
 }

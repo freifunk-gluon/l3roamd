@@ -9,6 +9,7 @@ const char *print_ip4(const struct in_addr *addr);
 const char* print_ip(const struct in6_addr* addr);
 void log_verbose(const char *format, ...);
 void log_debug(const char *format, ...);
+void log_error(const char *format, ...);
 
 void add_fd ( int efd, int fd, uint32_t events );
 void del_fd ( int efd, int fd );

@@ -392,7 +392,7 @@ bool intercom_handle_claim(intercom_ctx *ctx, intercom_packet_claim *packet, int
 	mac claim = { };
 	memcpy(&sender.s6_addr, &packet->hdr.sender, sizeof(uint8_t) * 16);
 
-	if (!memcmp(sender.s6_addr, ctx->ip, 16)) {
+	if (!memcmp(sender.s6_addr, ctx->ip.s6_addr, 16)) {
 		log_verbose("discarding claim from own node\n");
 		return false; // this makes the assumption that this packet was unicast. Claims should be unicast.
 	}
