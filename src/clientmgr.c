@@ -67,36 +67,33 @@ struct in6_addr mac2ipv6 ( uint8_t mac[ETH_ALEN], struct prefix *prefix )
 
 void print_client ( struct client *client )
 {
-	char ifname[IFNAMSIZ];
-	printf ( "Client %s", print_mac(client->mac));
+	log_verbose ( "Client %s", print_mac(client->mac));
 
 	if ( client_is_active ( client ) )
-		printf ( " (active" );
+		log_verbose ( " (active" );
 	else
-		printf ( " (______" );
+		log_verbose ( " (______" );
 
 	if ( client->ifindex != 0 ) {
+		char ifname[IFNAMSIZ];
 		if_indextoname ( client->ifindex, ifname );
-		printf ( ", %s/%i)\n", ifname, client->ifindex );
+		log_verbose ( ", %s/%i)\n", ifname, client->ifindex );
 	} else {
-		printf ( ")\n" );
+		log_verbose ( ")\n" );
 	}
 
 	for ( int i = VECTOR_LEN ( client->addresses ) - 1; i >= 0; i-- ) {
 		struct client_ip *addr = &VECTOR_INDEX ( client->addresses, i );
 
-		char str[INET6_ADDRSTRLEN];
-		inet_ntop ( AF_INET6, &addr->addr, str, INET6_ADDRSTRLEN );
-
 		switch ( addr->state ) {
 			case IP_INACTIVE:
-				printf ( "  %s  %s\n", state_str ( addr->state ), str );
+				log_verbose ( "  %s  %s\n", state_str ( addr->state ), print_ip(&addr->addr) );
 				break;
 			case IP_ACTIVE:
-				printf ( "  %s    %s (%ld.%.9ld)\n", state_str ( addr->state ), str, addr->timestamp.tv_sec, addr->timestamp.tv_nsec );
+				log_verbose ( "  %s    %s (%ld.%.9ld)\n", state_str ( addr->state ), print_ip(&addr->addr), addr->timestamp.tv_sec, addr->timestamp.tv_nsec );
 				break;
 			case IP_TENTATIVE:
-				printf ( "  %s %s (tries left: %d)\n", state_str ( addr->state ), str, addr->tentative_retries_left );
+				log_verbose ( "  %s %s (tries left: %d)\n", state_str ( addr->state ), print_ip(&addr->addr), addr->tentative_retries_left );
 				break;
 			default:
 				exit_bug ( "Invalid IP state %i- exiting due to memory corruption", addr->state );
@@ -121,7 +118,7 @@ bool client_is_active ( const struct client *client )
 		struct client_ip *ip = &VECTOR_INDEX ( client->addresses, i );
 
 		if ( ip_is_active ( ip ) ) {
-			log_debug("ip is active: %s\n", print_ip(&ip->addr));
+			log_debug("client [%s] is is active on ip %s\n", print_mac(client->mac), print_ip(&ip->addr));
 			return true;
 		}
 	}
@@ -345,11 +342,13 @@ struct client *create_client ( client_vector *vector, const uint8_t mac[ETH_ALEN
 {
 	struct client _client = {};
 	memcpy ( _client.mac, mac, sizeof ( uint8_t ) * 6 );
+	_client.ifindex = ifindex;
+	_client.node_ip_initialized = false;
+	_client.platprefix = l3ctx.clientmgr_ctx.platprefix;
+	VECTOR_INIT( _client.addresses );
 	VECTOR_ADD ( *vector, _client );
 	struct client *client = &VECTOR_INDEX ( *vector, VECTOR_LEN ( *vector ) - 1 );
-	client->ifindex = ifindex;
-	client->node_ip_initialized = false;
-	client->platprefix = l3ctx.clientmgr_ctx.platprefix;
+
 	return client;
 }
 
@@ -384,7 +383,7 @@ void client_copy_to_old ( struct client *client )
 	struct timespec now;
 	clock_gettime ( CLOCK_MONOTONIC, &now );
 	then.tv_sec = now.tv_sec + OLDCLIENTS_KEEP_SECONDS;
-	then.tv_nsec = 0;
+	then.tv_nsec = now.tv_nsec;
 
 	struct client *_client = create_client ( &l3ctx.clientmgr_ctx.oldclients,  client->mac, client->ifindex );
 	_client->timeout = then;
@@ -395,7 +394,7 @@ void client_copy_to_old ( struct client *client )
 	}
 
 	if ( l3ctx.debug ) {
-		printf ( "copied client to old-queue:\n" );
+		log_debug ( "copied client[%s] to old-queue:\n", print_mac(client->mac) );
 		print_client ( _client );
 	}
 }
@@ -576,7 +575,6 @@ void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address,
 	if ( l3ctx.debug ) {
 		char ifname[IFNAMSIZ];
 		if_indextoname ( ifindex, ifname );
-
 		log_debug ( "clientmgr_add_address: %s [%s] is running for interface %s(%i)\n", print_ip ( address ), print_mac(mac), ifname, ifindex );
 	}
 
@@ -712,15 +710,16 @@ bool clientmgr_handle_claim ( clientmgr_ctx *ctx, const struct in6_addr *sender,
 bool clientmgr_handle_info ( clientmgr_ctx *ctx, struct client *foreign_client )
 {
 	struct client *client = get_client ( foreign_client->mac );
+	if ( client == NULL ) {
+		log_debug ( "received info message for client %s but client is not locally connected - discarding message\n", print_mac(foreign_client->mac) );
+		return false;
+	}
+
 	if ( l3ctx.debug ) {
-		printf ( "handling info message in clientmgr_handle_info() for foreign_client " );
+		log_verbose ( "handling info message in clientmgr_handle_info() for foreign_client " );
 		print_client ( foreign_client );
 	}
 
-	if ( client == NULL ) {
-		log_debug ( "received info message for client but client is either not locally connected - discarding message\n" );
-		return false;
-	}
 
 	for ( int i = VECTOR_LEN ( foreign_client->addresses ) - 1; i >= 0; i-- ) {
 		struct client_ip *foreign_ip = &VECTOR_INDEX ( foreign_client->addresses, i );
@@ -743,6 +742,7 @@ bool clientmgr_handle_info ( clientmgr_ctx *ctx, struct client *foreign_client )
 
 void clientmgr_init()
 {
+	VECTOR_INIT( (&l3ctx.clientmgr_ctx)->clients );
 	post_task ( &l3ctx.taskqueue_ctx, OLDCLIENTS_KEEP_SECONDS, 0, purge_oldclients_task, NULL, NULL );
 }
 
