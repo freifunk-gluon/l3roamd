@@ -65,32 +65,49 @@ int tests_run = 0;
 #define _verify(test) do { int r=test(); tests_run++; if(r) return r; } while(0)
 
 
+int test_vector_init() {
+	VECTOR(int) v;
+	// initializing vector with bogus values
+	v.desc.length = 5;
+	v.desc.allocated = 12;
+
+	VECTOR_INIT(v);
+	_assert(v.desc.length == 0);
+	_assert(v.desc.allocated == 0);
+
+
+	VECTOR_ADD(v, 12);
+	_assert(v.desc.length == 1);
+
+	return 0;
+}
+
 int test_ntohl_ipv4() {
 	struct in_addr address;
 	inet_pton(AF_INET, "1.2.3.4", &address );
 	uint32_t reverse = ntohl(address.s_addr);
-	
+
 	char str[16];
 	inet_ntop(AF_INET, &reverse, str, 16);
 	printf("address: 1.2.3.4, reverse address: %s\n", str);
-	if (strncmp(str,"4.3.2.1", 7) != 0 ) {
-		FAIL();
-		return 1;
-	}
+
+	_assert(strncmp(str,"4.3.2.1", 7) == 0);
+
 	return 0;
 }
 
 int all_tests() {
 
-    _verify(test_ntohl_ipv4);
-    return 0;
+	_verify(test_vector_init);
+	_verify(test_ntohl_ipv4);
+	return 0;
 }
 
 int main(int argc, char **argv) {
-    int result = all_tests();
-    if (result == 0)
-        printf("PASSED\n");
-    printf("Tests run: %d\n", tests_run);
+	int result = all_tests();
+	if (result == 0)
+		printf("PASSED\n");
+	printf("Tests run: %d\n", tests_run);
 
-    return result != 0;
+	return result != 0;
 }

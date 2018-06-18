@@ -132,6 +132,16 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
 			_l3roamd_vector_delete(&_v->desc, (void **)&_v->data, (pos), sizeof(*_v->data)); \
 		})
 
+
+/**
+ Initializes the description of a vector v with 0
+   \hideinitializer
+   */
+#define VECTOR_INIT(v) ({						\
+		v.desc.length = 0;					\
+		v.desc.allocated = 0;					\
+	})
+
 /**
    Performs a binary search on the vector \e v, returning a pointer to a matching vector element
 
