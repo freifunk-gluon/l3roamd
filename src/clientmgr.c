@@ -118,7 +118,7 @@ bool client_is_active ( const struct client *client )
 		struct client_ip *ip = &VECTOR_INDEX ( client->addresses, i );
 
 		if ( ip_is_active ( ip ) ) {
-			log_debug("client [%s] is is active on ip %s\n", print_mac(client->mac), print_ip(&ip->addr));
+			log_debug("client [%s] is active on ip %s\n", print_mac(client->mac), print_ip(&ip->addr));
 			return true;
 		}
 	}

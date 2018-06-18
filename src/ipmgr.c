@@ -109,14 +109,13 @@ static void handle_packet ( ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len
         return;
 
     if ( !clientmgr_valid_address ( CTX ( clientmgr ), &dst ) ) {
-        char str[INET6_ADDRSTRLEN];
-        inet_ntop ( AF_INET6, &dst, str, sizeof str );
-        fprintf ( stderr, "The destination of the packet (%s) is not within the client prefixes. Ignoring packet\n", str );
+        log_verbose ( "The destination of the packet (%s) is not within the client prefixes. Ignoring packet\n", print_ip( &dst ) );
         return;
     }
 
     struct in6_addr src = packet_get_src ( packet );
-    log_verbose ( "Got packet from %s destined to %s\n", print_ip ( &src ), print_ip ( &dst ) );
+    log_verbose ( "Got packet from %s ", print_ip ( &src ) );
+    log_verbose ( "destined to %s\n", print_ip ( &dst ) );
 
 
     struct timespec now;
