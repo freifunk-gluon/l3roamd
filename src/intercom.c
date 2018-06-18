@@ -22,8 +22,7 @@
 #define INTERCOM_GROUP "ff02::5523"
 #define INTERCOM_MAX_RECENT 100
 
-void schedule_claim_retry(struct intercom_task*, int ms_timeout);
-void schedule_info_retry(struct intercom_task*, int ms_timeout);
+void schedule_retries(struct intercom_task *data, int ms_timeout, void (*processor)(void *data)  );
 
 bool join_mcast(const int sock, const struct in6_addr addr, intercom_if *iface) {
 	struct ipv6_mreq mreq;
@@ -593,7 +592,7 @@ void info_retry_task(void *d) {
 	}
 
 	if (data->retries_left > 0)
-		schedule_info_retry(data, 500);
+		schedule_retries(data, 500, info_retry_task);
 	else {
 		// we have not received an ACK message, otherwise we would not have run out of retries => likely packet loss. At some point in time, retries need to stop.
 		VECTOR_DELETE(l3ctx.intercom_ctx.repeatable_infos, repeatable_info_index);
@@ -656,7 +655,7 @@ void claim_retry_task(void *d) {
 	}
 
 	if (data->retries_left > 0 && unicast_packet_sent)
-		schedule_claim_retry(data, 300);
+		schedule_retries(data, 300, claim_retry_task);
 	else {
 		// we have not received an info message or sending a unicast claim was not successful
 		// the only valid business reason for this to happens is when there is no route to the client, so it must be new to the network
@@ -686,7 +685,7 @@ void copy_intercom_task(struct intercom_task *old, struct intercom_task *new) {
 	new->retries_left = old->retries_left;
 }
 
-void schedule_info_retry(struct intercom_task *data, int ms_timeout) {
+void schedule_retries(struct intercom_task *data, int ms_timeout, void (*processor)(void *data)  ) {
 	if (data->retries_left == 0)
 		return;
 
@@ -694,18 +693,7 @@ void schedule_info_retry(struct intercom_task *data, int ms_timeout) {
 	copy_intercom_task(data, ndata);
 	ndata->retries_left--;
 
-	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, info_retry_task, free_intercom_task, ndata);
-}
-
-void schedule_claim_retry(struct intercom_task *data, int ms_timeout) {
-	if (data->retries_left == 0)
-		return;
-
-	struct intercom_task *ndata = l3roamd_alloc(sizeof(struct intercom_task));
-	copy_intercom_task(data, ndata);
-	ndata->retries_left--;
-
-	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, claim_retry_task, free_intercom_task, ndata);
+	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, processor, free_intercom_task, ndata);
 }
 
 bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
