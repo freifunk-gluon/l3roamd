@@ -355,7 +355,7 @@ struct client *create_client ( client_vector *vector, const uint8_t mac[ETH_ALEN
 
 /** Get a client or create a new, empty one.
 */
-struct client *get_or_create_client ( clientmgr_ctx *ctx, const uint8_t mac[ETH_ALEN], unsigned int ifindex )
+struct client *get_or_create_client ( const uint8_t mac[ETH_ALEN], unsigned int ifindex )
 {
 	struct client *client = get_client ( mac );
 
@@ -568,9 +568,8 @@ void clientmgr_remove_address ( clientmgr_ctx *ctx, struct client *client, struc
 */
 void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address, const uint8_t *mac, const unsigned int ifindex )
 {
-
 	if ( !clientmgr_valid_address ( ctx, address ) ) {
-		log_debug ( "address is not within a client-prefix and not ll-address, not adding: %s\n", print_ip ( address ) );
+		log_debug ( "address is not within a client-prefix and not an ll-address. Not adding %s to client %s\n", print_ip ( address ), print_mac(mac) );
 		return;
 	}
 
@@ -578,10 +577,10 @@ void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address,
 		char ifname[IFNAMSIZ];
 		if_indextoname ( ifindex, ifname );
 
-		log_debug ( "clientmgr_add_address: %s [%s] is running for interface %s[%i]\n", print_ip ( address ), print_mac(mac), ifname, ifindex );
+		log_debug ( "clientmgr_add_address: %s [%s] is running for interface %s(%i)\n", print_ip ( address ), print_mac(mac), ifname, ifindex );
 	}
 
-	struct client *client = get_or_create_client ( ctx, mac, ifindex );
+	struct client *client = get_or_create_client ( mac, ifindex );
 	struct client_ip *ip = get_client_ip ( client, address );
 	client->ifindex = ifindex; // client might have roamed to different interface on the same node
 
@@ -610,7 +609,7 @@ void clientmgr_notify_mac ( clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifind
 	if ( memcmp ( mac , "\x00\x00\x00\x00\x00\x00", 6 ) == 0 )
 		return;
 
-	struct client *client = get_or_create_client ( ctx, mac, ifindex );
+	struct client *client = get_or_create_client ( mac, ifindex );
 
 	if ( client_is_active ( client ) ) {
 		log_debug ( "client[%s] was detected earlier, not re-adding\n", print_mac(client->mac));

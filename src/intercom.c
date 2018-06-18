@@ -642,7 +642,7 @@ void claim_retry_task(void *d) {
 
 	int repeatable_claim_index;
 	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index)) {
-		log_verbose("could not find repeatable claim for client [%s], returning.\n", print_mac(data->client->mac));
+		log_debug("could not find repeatable claim for client [%s]. This happens when an INFO packet was received before all claim retry-cycles are spent. Returning.\n", print_mac(data->client->mac));
 		return;
 	}
 
@@ -740,7 +740,7 @@ bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct 
 	VECTOR_ADD(ctx->repeatable_claims, *client);
 
 	data->client = l3roamd_alloc(sizeof(struct client));
-	memcpy(data->client, client,sizeof(struct client));
+	memcpy(data->client, client, sizeof(struct client));
 	data->retries_left = CLAIM_RETRY_MAX;
 	data->check_task = NULL;
 	data->recipient = NULL;

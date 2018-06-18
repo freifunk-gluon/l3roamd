@@ -19,7 +19,7 @@ const char inline *print_ip(const struct in6_addr *addr) {
 	return inet_ntop(AF_INET6, &(addr->s6_addr), ipaddress_buffer, INET6_ADDRSTRLEN);
 }
 
-void mac_addr_n2a ( char *mac_addr, const unsigned char *arg )
+static void mac_addr_n2a ( char *mac_addr, const unsigned char *arg )
 {
 	int i, l;
 
