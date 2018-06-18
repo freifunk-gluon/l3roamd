@@ -345,6 +345,7 @@ struct client *create_client ( client_vector *vector, const uint8_t mac[ETH_ALEN
 	_client.ifindex = ifindex;
 	_client.node_ip_initialized = false;
 	_client.platprefix = l3ctx.clientmgr_ctx.platprefix;
+	_client.claimed = false;
 	VECTOR_INIT( _client.addresses );
 	VECTOR_ADD ( *vector, _client );
 	struct client *client = &VECTOR_INDEX ( *vector, VECTOR_LEN ( *vector ) - 1 );
@@ -527,7 +528,7 @@ void client_ip_set_state ( clientmgr_ctx *ctx, struct client *client, struct cli
 	}
 
 	if ( !nop || l3ctx.debug )
-		printf ( "%s changes from %s to %s\n", print_ip ( &ip->addr ), state_str ( ip->state ), state_str ( state ) );
+		log_error ( "%s changes from %s to %s\n", print_ip ( &ip->addr ), state_str ( ip->state ), state_str ( state ) );
 
 	ip->state = state;
 }
@@ -582,7 +583,6 @@ void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address,
 	struct client_ip *ip = get_client_ip ( client, address );
 	client->ifindex = ifindex; // client might have roamed to different interface on the same node
 
-	bool was_active = client_is_active ( client );
 	bool ip_is_new = ip == NULL;
 
 	if ( ip_is_new ) {
@@ -593,7 +593,7 @@ void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address,
 	}
 	client_ip_set_state ( ctx, client, ip, IP_ACTIVE );
 
-	if ( !was_active ) {
+	if ( ! client->claimed ) {
 		struct in6_addr address = mac2ipv6 ( client->mac, &ctx->node_client_prefix );
 		intercom_claim ( CTX ( intercom ), &address, client ); // this will set the special_ip after the claiming cycle
 	}
@@ -622,7 +622,9 @@ void clientmgr_notify_mac ( clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifind
 	client->ifindex = ifindex;
 
 	struct in6_addr address = mac2ipv6 ( client->mac, &ctx->node_client_prefix );
-	intercom_claim ( CTX ( intercom ), &address, client );
+
+	if ( ! client->claimed )
+		intercom_claim ( CTX ( intercom ), &address, client );
 
 	for ( int i = VECTOR_LEN ( client->addresses )-1; i >= 0; i-- ) {
 		struct client_ip *ip = &VECTOR_INDEX ( client->addresses, i );

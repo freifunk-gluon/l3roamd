@@ -696,8 +696,8 @@ void schedule_retries(struct intercom_task *data, int ms_timeout, void (*process
 	ndata->check_task = post_task(&l3ctx.taskqueue_ctx, 0, ms_timeout, processor, free_intercom_task, ndata);
 }
 
-bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
-
+bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client)
+{
 	log_verbose("sending ACK for client [%s] to %s\n", print_mac(client->mac) , print_ip(recipient));
 
 	intercom_packet_claim *packet = l3roamd_alloc(sizeof(intercom_packet_ack) + 8);
@@ -738,6 +738,8 @@ bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct 
 		memcpy(data->recipient, recipient, sizeof(struct in6_addr));
 		((intercom_packet_claim*)data->packet)->hdr.ttl = 1; // when sending unicast, do not continue to forward this packet at the destination
 	}
+
+	client->claimed = true;
 
 	data->check_task = post_task(&l3ctx.taskqueue_ctx, 0, 0, claim_retry_task, free_intercom_task, data);
 	return true;

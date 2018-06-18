@@ -32,6 +32,7 @@ typedef struct client {
 	int fd;
 	unsigned int ifindex;
 	bool node_ip_initialized;
+	bool claimed;
 	uint8_t mac[ETH_ALEN];
 } client_t;
 
