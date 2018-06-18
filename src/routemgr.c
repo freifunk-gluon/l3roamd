@@ -64,8 +64,10 @@ void rtnl_handle_neighbour ( routemgr_ctx *ctx, const struct nlmsghdr *nh )
     if ( ! ( ctx->clientif_index == msg->ndm_ifindex || ctx->client_bridge_index == msg->ndm_ifindex ) )
         return;
 
-    if ( tb[NDA_LLADDR] )
-        mac_addr_n2a ( mac_str, RTA_DATA ( tb[NDA_LLADDR] ) );
+    if ( tb[NDA_LLADDR] ) 
+	    memcpy(mac_str, print_mac( RTA_DATA ( tb[NDA_LLADDR] ) ), 18);
+    else // The only thing we could do without mac is send arp to an ip address. whenever there is an ip, there is also a mac
+	return;
 
     struct in6_addr dst_address = {};
 
@@ -124,7 +126,6 @@ void client_bridge_changed ( const struct nlmsghdr *nh, const struct ifinfomsg *
     struct rtattr * tb[IFLA_MAX+1];
     memset ( tb, 0, sizeof ( struct rtattr * ) * ( IFLA_MAX + 1 ) );
     char ifname[IFNAMSIZ];
-    char str_mac[6*3];
     if ( if_indextoname ( msg->ifi_index,ifname ) == 0 )
         return;
 
@@ -133,24 +134,23 @@ void client_bridge_changed ( const struct nlmsghdr *nh, const struct ifinfomsg *
         parse_rtattr ( tb, IFLA_MAX, IFLA_RTA ( msg ), nh->nlmsg_len - NLMSG_LENGTH ( sizeof ( *msg ) ) );
 
         if ( !tb[IFLA_ADDRESS] ) {
-            printf ( "client_bridge_changed called but mac could not be extracted - ignoring event.\n" );
+            log_debug ( "client_bridge_changed called but mac could not be extracted - ignoring event.\n" );
             return;
         }
 
         if ( !memcmp ( RTA_DATA ( tb[IFLA_ADDRESS] ), l3ctx.routemgr_ctx.bridge_mac, 6 ) ) {
-            printf ( "client_bridge_changed called, change detected BUT mac [%s] address is the mac of the bridge, not triggering any client actions\n", str_mac );
+            log_debug ( "client_bridge_changed called, change detected BUT mac [%s] address is the mac of the bridge, not triggering any client actions\n", print_mac(RTA_DATA ( tb[IFLA_ADDRESS] )));
             return;
         }
 
-        mac_addr_n2a ( str_mac, RTA_DATA ( tb[IFLA_ADDRESS] ) );
         switch ( nh->nlmsg_type ) {
         case RTM_NEWLINK:
-            printf ( "new station [%s] found in fdb on interface %s\n", str_mac, ifname );
+            log_verbose ( "new station [%s] found in fdb on interface %s\n", print_mac( RTA_DATA ( tb[IFLA_ADDRESS] ) ) , ifname );
             clientmgr_notify_mac ( &l3ctx.clientmgr_ctx, RTA_DATA ( tb[IFLA_ADDRESS] ), msg->ifi_index );
             break;
 
         case RTM_SETLINK:
-            printf ( "set link %i\n", msg->ifi_index );
+            log_verbose ( "set link %i\n", msg->ifi_index );
             break;
 
         case RTM_DELLINK:
@@ -290,11 +290,7 @@ void routemgr_init ( routemgr_ctx *ctx )
     ioctl ( ctx->fd, SIOCGIFHWADDR, &req );
     memcpy ( ctx->bridge_mac, req.ifr_hwaddr.sa_data, 6 );
 
-    if ( l3ctx.debug ) {
-        char str_mac[18];
-        mac_addr_n2a ( str_mac, ctx->bridge_mac );
-        printf ( "extracted mac of client-bridge: %s\n",str_mac );
-    }
+    log_debug ( "extracted mac of client-bridge: %s\n", print_mac(ctx->bridge_mac) );
 
     ctx->clientif_index = if_nametoindex ( ctx->clientif );
     ctx->client_bridge_index = if_nametoindex ( ctx->client_bridge );

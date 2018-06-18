@@ -22,10 +22,6 @@
 #define INTERCOM_GROUP "ff02::5523"
 #define INTERCOM_MAX_RECENT 100
 
-#define CLAIM_RETRY_MAX 15
-#define INFO_RETRY_MAX 15
-
-
 void schedule_claim_retry(struct intercom_task*, int ms_timeout);
 void schedule_info_retry(struct intercom_task*, int ms_timeout);
 
@@ -430,11 +426,7 @@ struct client *find_repeatable (void *v, client_t *k, int *elementindex )
 	// TODO: replace this with VECTOR_BSEARCH
 	struct client *ret = (struct client*)VECTOR_LSEARCH ( &key, vec, client_compare_by_mac );
 
-	if (l3ctx.debug) {
-		char str_mac[18];
-		mac_addr_n2a(str_mac, k->mac);
-		log_debug( "match on vector for mac %s", str_mac);
-	}
+	log_debug( "match on vector for mac %s", print_mac( k->mac ));
 
 	if ( ret != NULL && elementindex != NULL ) {
 		*elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( vec, 0 ) ) / sizeof ( struct unknown_address );
@@ -465,11 +457,7 @@ bool intercom_handle_ack(intercom_ctx *ctx, intercom_packet_ack *packet, int pac
 		}
 	}
 
-	if (l3ctx.debug) {
-		char str_mac[18];
-		mac_addr_n2a(str_mac, client_mac.mac);
-		log_verbose("handling ACK packet for Client with mac %s\n", str_mac);
-	}
+	log_verbose("handling ACK packet for Client with mac %s\n", print_mac( client_mac.mac ) );
 
 	int i = 0;
 	client_t c = {};
@@ -593,16 +581,13 @@ void info_retry_task(void *d) {
 	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_infos, data->client, &repeatable_info_index))
 		return;
 
-	char str_mac[18];
-	mac_addr_n2a(str_mac, data->client->mac);
-
 	if (data->recipient != NULL) {
-		log_debug("sending unicast info with length %i for client %s to %s\n",  data->packet_len, str_mac, print_ip(data->recipient));
+		log_debug("sending unicast info with length %i for client %s to %s\n",  data->packet_len, print_mac(data->client->mac), print_ip(data->recipient));
 		intercom_send_packet_unicast(&l3ctx.intercom_ctx, data->recipient, (uint8_t*)(data->packet), data->packet_len);
 	}
 	else {
 		// forward packet to other l3roamd instances
-		log_debug("sending info for client %s to l3roamd neighbours\n", str_mac);
+		log_debug("sending info for client %s to l3roamd neighbours\n", print_mac( data->client->mac) );
 		intercom_recently_seen_add(&l3ctx.intercom_ctx, &((intercom_packet_info*)data->packet)->hdr);
 		intercom_send_packet(&l3ctx.intercom_ctx, data->packet, data->packet_len);
 	}
@@ -619,13 +604,8 @@ bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct c
 	int i;
 	if (find_repeatable(&ctx->repeatable_infos, client, &i))
 		return true;
-	else {
-		if (l3ctx.debug) {
-			char mac_str[18];
-			mac_addr_n2a(mac_str, client->mac);
-			log_debug("Assembling INFO for client [%s]\n", mac_str);
-		}
-	}
+	else
+		log_debug("Assembling INFO for client [%s]\n", print_mac(client->mac));
 
 	struct intercom_task *data = l3roamd_alloc(sizeof(struct intercom_task));
 	data->packet = l3roamd_alloc(sizeof(intercom_packet_info) + sizeof(intercom_packet_info_plat) +  (8 + INFO_MAX * sizeof(intercom_packet_info_entry)));
@@ -662,8 +642,7 @@ void claim_retry_task(void *d) {
 
 	int repeatable_claim_index;
 	if (!find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, data->client, &repeatable_claim_index)) {
-		log_verbose("could not find repeatable claim for client, returning.\n");
-		print_client(data->client);
+		log_verbose("could not find repeatable claim for client [%s], returning.\n", print_mac(data->client->mac));
 		return;
 	}
 
@@ -731,18 +710,12 @@ void schedule_claim_retry(struct intercom_task *data, int ms_timeout) {
 
 bool intercom_ack(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
 
-	if (l3ctx.debug) {
-		char mac_str[18];
-		mac_addr_n2a(mac_str, client->mac);
-		log_verbose("sending ACK for client [%s] to %s\n", mac_str, print_ip(recipient));
-	}
+	log_verbose("sending ACK for client [%s] to %s\n", print_mac(client->mac) , print_ip(recipient));
 
 	intercom_packet_claim *packet = l3roamd_alloc(sizeof(intercom_packet_ack) + 8);
 
 	int currentoffset = assemble_header(&packet->hdr, 255, INTERCOM_ACK);
 	currentoffset += assemble_macinfo((void*)(packet) + currentoffset, client->mac, ACK_MAC);
-
-//	intercom_recently_seen_add(ctx, &packet->hdr);
 
 	intercom_send_packet_unicast(ctx, recipient, (uint8_t*)packet, currentoffset);
 
@@ -755,13 +728,8 @@ bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct 
 
 	if (find_repeatable(&l3ctx.intercom_ctx.repeatable_claims, client, &i))
 		return true;
-	else {
-		if (l3ctx.verbose) {
-			char mac_str[18];
-			mac_addr_n2a(mac_str, client->mac);
-			log_verbose("CLAIMING client [%s]\n", mac_str);
-		}
-	}
+	
+	log_verbose("CLAIMING client [%s]\n", print_mac(client->mac));
 
 	struct intercom_task *data = l3roamd_alloc(sizeof(struct intercom_task));
 	data->packet = l3roamd_alloc(sizeof(intercom_packet_claim) + 8);

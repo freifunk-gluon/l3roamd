@@ -10,12 +10,35 @@
 /* print a human-readable representation of an in6_addr struct to stdout
 ** */
 static char ipaddress_buffer[INET6_ADDRSTRLEN+1];
+static char mac_buffer[INET6_ADDRSTRLEN+1];
 
 const char inline *print_ip4(const struct in_addr *addr) {
 	return inet_ntop(AF_INET, &(addr->s_addr), ipaddress_buffer, INET6_ADDRSTRLEN);
 }
 const char inline *print_ip(const struct in6_addr *addr) {
 	return inet_ntop(AF_INET6, &(addr->s6_addr), ipaddress_buffer, INET6_ADDRSTRLEN);
+}
+
+void mac_addr_n2a ( char *mac_addr, const unsigned char *arg )
+{
+	int i, l;
+
+	for ( i = 0, l = 0; i < 6; i++ ) {
+		if ( i == 0 ) {
+			sprintf ( mac_addr+l, "%02x", arg[i] );
+			l += 2;
+		} else {
+			sprintf ( mac_addr+l, ":%02x", arg[i] );
+			l += 3;
+		}
+	}
+	mac_addr[17] = '\0';
+}
+
+
+const char *print_mac(const uint8_t *mac) {
+	mac_addr_n2a(mac_buffer, mac);
+	return mac_buffer;
 }
 
 struct in_addr inline extractv4_v6(const struct in6_addr *src) {

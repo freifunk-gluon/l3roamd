@@ -2,6 +2,7 @@
 #include "error.h"
 #include "wifistations.h"
 #include "clientmgr.h"
+#include "util.h"
 #include "l3roamd.h"
 #include "if.h"
 
@@ -39,8 +40,6 @@ int wifistations_handle_event(struct nl_msg *msg, void *arg) {
 
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct nlattr *tb[8];
-	char str_mac[6*3];
-
 
 	// TODO only handle events from interfaces we care about.
 
@@ -48,35 +47,25 @@ int wifistations_handle_event(struct nl_msg *msg, void *arg) {
 	if (gnlh == NULL)
 		return 0;
 
-	// if (l3ctx.debug)
-	//	printf("WIFISTATIONS received nl80211-event %i\n", gnlh->cmd);
-
 	nla_parse(tb, 8, genlmsg_attrdata(gnlh, 0),
 	genlmsg_attrlen(gnlh, 0), NULL);
 
 
-	if (!tb[NL80211_ATTR_MAC]) {
-	//	printf("wifistations_handle_event: no mac address found in nl80211-message - aborting\n");
+	if (!tb[NL80211_ATTR_MAC])
 		return 0;
-	}
 
 	char ifname[IFNAMSIZ];
 	unsigned int ifindex = nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
 	if_indextoname(ifindex, ifname);
 
-	mac_addr_n2a(str_mac, nla_data(tb[NL80211_ATTR_MAC]));
 	switch (gnlh->cmd) {
 		case NL80211_CMD_NEW_STATION:
-
-			printf("new wifi station [%s] found on interface %s\n", str_mac, ifname);
+			log_verbose("new wifi station [%s] found on interface %s\n", print_mac( nla_data( tb[NL80211_ATTR_MAC] ) ), ifname);
 			ifindex = ctx->l3ctx->icmp6_ctx.ifindex;
 			clientmgr_notify_mac(CTX(clientmgr), nla_data(tb[NL80211_ATTR_MAC]), ifindex);
 			break;
 		case NL80211_CMD_DEL_STATION:
-			// station was disconnected, remove the client moving
-			// it to the old-queue
-			if (l3ctx.debug)
-				printf("NL80211_CMD_DEL_STATION for [%s] RECEIVED on interface %s.\n", str_mac, ifname);
+			log_verbose("NL80211_CMD_DEL_STATION for [%s] RECEIVED on interface %s.\n", print_mac( nla_data(tb[NL80211_ATTR_MAC]) ), ifname);
 			clientmgr_delete_client(CTX(clientmgr), nla_data(tb[NL80211_ATTR_MAC]));
 			break;
 	}

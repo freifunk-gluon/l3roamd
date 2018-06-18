@@ -43,23 +43,6 @@
 /* Static functions used only in this file. */
 static const char *state_str ( enum ip_state state );
 
-void mac_addr_n2a ( char *mac_addr, const unsigned char *arg )
-{
-	int i, l;
-
-	for ( i = 0, l = 0; i < 6; i++ ) {
-		if ( i == 0 ) {
-			sprintf ( mac_addr+l, "%02x", arg[i] );
-			l += 2;
-		} else {
-			sprintf ( mac_addr+l, ":%02x", arg[i] );
-			l += 3;
-		}
-	}
-	mac_addr[17] = '\0';
-}
-
-
 //struct in6_addr node_client_mcast_ip_from_mac(uint8_t mac[ETH_ALEN]) {
 //	char addr_str[INET6_ADDRSTRLEN];
 //	snprintf(&addr_str[0], INET6_ADDRSTRLEN, "ff02::1:ff%02x:%02x%02x", mac[3], mac[4], mac[5]);
@@ -85,10 +68,7 @@ struct in6_addr mac2ipv6 ( uint8_t mac[ETH_ALEN], struct prefix *prefix )
 void print_client ( struct client *client )
 {
 	char ifname[IFNAMSIZ];
-	char mac_str[18];
-
-	mac_addr_n2a ( mac_str, client->mac );
-	printf ( "Client %s", mac_str );
+	printf ( "Client %s", print_mac(client->mac));
 
 	if ( client_is_active ( client ) )
 		printf ( " (active" );
@@ -194,9 +174,7 @@ void add_special_ip ( clientmgr_ctx *ctx, struct client *client )
 		return;
 
 	if ( client->node_ip_initialized ) {
-		char mac_str[18];
-		mac_addr_n2a ( mac_str, client->mac );
-		printf ( "we already initialized the special client [%s] not doing it again\n", mac_str );
+		log_error ( "we already initialized the special client [%s] not doing it again\n", print_mac(client->mac));
 		return;
 	}
 
@@ -341,7 +319,6 @@ struct client *get_client_old ( const uint8_t mac[ETH_ALEN] )
 */
 bool clientmgr_is_known_address ( clientmgr_ctx *ctx, const struct in6_addr *address, struct client **client )
 {
-
 	// TODO: we probably should make this more efficient for large lists of clients and IP addresses at one point.
 	for ( int i = VECTOR_LEN ( ctx->clients ) - 1; i>=0; i-- ) {
 		struct client *c = &VECTOR_INDEX ( ctx->clients, i );
@@ -349,11 +326,7 @@ bool clientmgr_is_known_address ( clientmgr_ctx *ctx, const struct in6_addr *add
 		for ( int j = VECTOR_LEN ( c->addresses )-1; j>=0; j-- ) {
 			struct client_ip *a = &VECTOR_INDEX ( c->addresses, j );
 			if ( !memcmp ( address, &a->addr, sizeof ( struct in6_addr ) ) ) {
-				if ( l3ctx.debug ) {
-					char mac_str[18];
-					mac_addr_n2a ( mac_str, c->mac );
-					printf ( "%s is attached to local client %s\n", print_ip ( address ), mac_str );
-				}
+				log_debug ( "%s is attached to local client %s\n", print_ip ( address ), print_mac(c->mac) );
 
 				if ( client ) {
 					*client = c;
@@ -450,17 +423,13 @@ void client_deactivate ( struct client *client )
 void clientmgr_delete_client ( clientmgr_ctx *ctx, uint8_t mac[ETH_ALEN] )
 {
 	struct client *client = get_client ( mac );
-	char mac_str[18];
-	mac_addr_n2a ( mac_str, mac );
 
 	if ( client == NULL ) {
-		if ( l3ctx.debug ) {
-			printf ( "Client [%s] unknown: cannot delete\n", mac_str );
-		}
+		log_debug ( "Client [%s] unknown: cannot delete\n", print_mac(mac) );
 		return;
 	}
 
-	printf ( "\033[34mREMOVING client %s and invalidating its IP-addresses\033[0m\n", mac_str );
+	log_verbose ( "\033[34mREMOVING client %s and invalidating its IP-addresses\033[0m\n", print_mac(mac) );
 	print_client ( client );
 
 	client_copy_to_old ( client );
@@ -583,20 +552,14 @@ bool clientmgr_valid_address ( clientmgr_ctx *ctx, const struct in6_addr *addres
 **/
 void clientmgr_remove_address ( clientmgr_ctx *ctx, struct client *client, struct in6_addr *address )
 {
-	if ( l3ctx.debug ) {
-		char str[INET6_ADDRSTRLEN];
-		inet_ntop ( AF_INET6, address, str, INET6_ADDRSTRLEN );
-		char strmac[18];
-		mac_addr_n2a ( strmac, client->mac );
-		printf ( "clientmgr_remove_address: %s is running for client %s",str, strmac );
-	}
+	log_debug ( "clientmgr_remove_address: %s is running for client %s", print_ip(address), print_mac(client->mac) );
 
 	if ( client ) {
 		delete_client_ip ( client, address, true );
 	}
 
 	if ( !client_is_active ( client ) ) {
-		printf ( "no active IP-addresses left in client. Deleting client.\n" );
+		log_verbose ( "no active IP-addresses left in client. Deleting client. %s\n", print_mac(client->mac) );
 		clientmgr_delete_client ( &l3ctx.clientmgr_ctx, client->mac );
 	}
 }
@@ -612,13 +575,10 @@ void clientmgr_add_address ( clientmgr_ctx *ctx, const struct in6_addr *address,
 	}
 
 	if ( l3ctx.debug ) {
-		char mac_str[18] = "";
-		mac_addr_n2a ( mac_str, mac );
 		char ifname[IFNAMSIZ];
-
 		if_indextoname ( ifindex, ifname );
 
-		printf ( "clientmgr_add_address: %s [%s] is running for interface %i %s\n", print_ip ( address ), mac_str, ifindex, ifname );
+		log_debug ( "clientmgr_add_address: %s [%s] is running for interface %s[%i]\n", print_ip ( address ), print_mac(mac), ifname, ifindex );
 	}
 
 	struct client *client = get_or_create_client ( ctx, mac, ifindex );
@@ -651,18 +611,16 @@ void clientmgr_notify_mac ( clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifind
 		return;
 
 	struct client *client = get_or_create_client ( ctx, mac, ifindex );
-	char mac_str[18];
-	mac_addr_n2a ( mac_str, client->mac );
 
 	if ( client_is_active ( client ) ) {
-		log_debug ( "client[%s] was detected earlier, not re-adding\n", mac_str );
+		log_debug ( "client[%s] was detected earlier, not re-adding\n", print_mac(client->mac));
 		return;
 	}
 
 	char ifname[IFNAMSIZ];
 	if_indextoname ( ifindex, ifname );
 
-	printf ( "\033[34mnew client %s on %s\033[0m\n", mac_str, ifname );
+	log_verbose ( "\033[34mnew client %s on %s\033[0m\n", print_mac(client->mac), ifname );
 
 	client->ifindex = ifindex;
 

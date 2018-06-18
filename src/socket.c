@@ -128,8 +128,8 @@ void get_clients(struct json_object *obj) {
         struct client *_client = &VECTOR_INDEX(l3ctx.clientmgr_ctx.clients, i);
         struct json_object *jclient = json_object_new_object();
 
-        char mac[18] = {};
-        mac_addr_n2a(mac, _client->mac);
+        // char mac[18] = {};
+        // mac_addr_n2a(mac, _client->mac);
         char ifname[IFNAMSIZ] = "";
 
         if_indextoname(_client->ifindex, ifname);
@@ -153,7 +153,7 @@ void get_clients(struct json_object *obj) {
             json_object_put(addresses);
         }
 
-        json_object_object_add(jclients,mac, jclient);
+        json_object_object_add(jclients, print_mac( _client->mac), jclient);
     }
 
     if (i) {
