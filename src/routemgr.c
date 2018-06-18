@@ -154,9 +154,9 @@ void client_bridge_changed ( const struct nlmsghdr *nh, const struct ifinfomsg *
             break;
 
         case RTM_DELLINK:
-            printf ( "del link %i\n", msg->ifi_index );
-            printf ( "fdb-entry was removed for [%s].\n", str_mac ); // TODO: move client to old-queue
-            break;
+	    log_verbose ( "del link on %i, fdb-entry was removed for [%s].\n", msg->ifi_index, print_mac( RTA_DATA ( tb[IFLA_ADDRESS] ) ) );
+	    clientmgr_delete_client(&l3ctx.clientmgr_ctx, RTA_DATA ( tb[IFLA_ADDRESS] ) );
+	    break;
         }
     }
 
