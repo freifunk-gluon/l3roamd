@@ -194,7 +194,7 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 		if (ctx->ndp_disabled)
 			return;
 
-		if (rc <= 0) 
+		if (rc <= 0)
 			return;
 
 		log_debug("handling icmp6-NDP packet\n");
@@ -210,7 +210,7 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 			if (l3ctx.debug) {
 				char str[INET6_ADDRSTRLEN];
 				inet_ntop(AF_INET6, &packet.hdr.ip6_src, str, INET6_ADDRSTRLEN);
-				printf("Received Neighbor Solicitation from %s [%02x:%02x:%02x:%02x:%02x:%02x] for IP %s. Learning source-IP for client.\n", str, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], print_ip(&packet.sol.hdr.nd_ns_target));
+				log_debug("Received Neighbor Solicitation from %s [%s] for IP %s. Learning source-IP for client.\n", str, print_mac(mac), print_ip(&packet.sol.hdr.nd_ns_target));
 			}
 
 			clientmgr_notify_mac(CTX(clientmgr), mac, ctx->ifindex);
