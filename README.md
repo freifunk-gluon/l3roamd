@@ -271,7 +271,7 @@ lease is the remaining lease time of the clients ipv4 address in seconds.
 
 ### ACK
 This packet is sent in reply of an INFO packet. Upon reception the retry-cycle for sending INFO packets for the client identified by the MAC is aborted.
-
+```
 0        7        15       23       31
 +-----------------------------------+
 | VERSION|  TTL   |  type  | empty  |
@@ -290,7 +290,7 @@ This packet is sent in reply of an INFO packet. Upon reception the retry-cycle f
 +--------+--------+--------+--------+
 |  MAC3  |  MAC4  |  MAC5  |  MAC6  |
 +-----------------------------------+
-
+```
 ---
   
   
