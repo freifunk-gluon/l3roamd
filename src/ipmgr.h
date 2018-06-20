@@ -28,6 +28,7 @@
 #include "vector.h"
 #include "taskqueue.h"
 #include "types.h"
+#include "time.h"
 
 #include <stdint.h>
 #include <netinet/in.h>
@@ -48,6 +49,14 @@ typedef struct {
     int fd;
 } ipmgr_ctx;
 
+struct ns_task {
+    struct in6_addr address;
+    struct timespec interval;
+    ipmgr_ctx *ctx;
+    int retries_left;
+    bool force;
+};
+
 struct ip_task {
     struct in6_addr address;
     ipmgr_ctx *ctx;
@@ -58,4 +67,6 @@ void ipmgr_route_appeared ( ipmgr_ctx *ctx, const struct in6_addr *destination )
 void ipmgr_handle_in ( ipmgr_ctx *ctx, int fd );
 void ipmgr_handle_out ( ipmgr_ctx *ctx, int fd );
 void ipmgr_seek_address ( ipmgr_ctx *ctx, struct in6_addr *addr );
+struct ns_task *create_ns_task ( struct in6_addr *dst, struct timespec tv, int retries, bool force );
+void ipmgr_ns_task ( void *d );
 

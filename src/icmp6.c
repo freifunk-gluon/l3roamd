@@ -2,6 +2,7 @@
 #include "l3roamd.h"
 #include "util.h"
 #include "packet.h"
+#include "ipmgr.h"
 
 #include <linux/in6.h>
 #include <stddef.h>
@@ -204,6 +205,9 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 		if (packet.sol.hdr.nd_ns_hdr.icmp6_type == ND_NEIGHBOR_SOLICIT) {
 			if (memcmp(&packet.hdr.ip6_src, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16) == 0) {
 				// client is doing DAD. We could trigger sending NS on this IP address for a couple of times in a while to learn its address instead of flooding the network. If we do this, what effects will this have on privacy extensions?
+				log_verbose("triggering local NS cycle after DAD for address %s\n",print_ip(&packet.sol.hdr.nd_ns_target));
+				struct ns_task *ns_data = create_ns_task ( &packet.sol.hdr.nd_ns_target, (struct timespec){.tv_sec=0, .tv_nsec=300000000,}, 15, true);
+				post_task ( CTX ( taskqueue ), 0, 0, ipmgr_ns_task, free, ns_data );
 				continue;
 			}
 

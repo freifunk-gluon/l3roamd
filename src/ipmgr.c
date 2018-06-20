@@ -19,7 +19,6 @@
 #include <linux/if_packet.h>
 #include <linux/in6.h>
 
-static void ipmgr_ns_task ( void *d );
 static void seek_task ( void *d );
 static void ipmgr_purge_task ( void *d );
 
@@ -62,6 +61,20 @@ void delete_entry ( const struct in6_addr *k )
 	VECTOR_DELETE ( ( &l3ctx.ipmgr_ctx )->addrs, i );
 }
 
+struct ns_task *create_ns_task ( struct in6_addr *dst, struct timespec tv, int retries, bool force ) {
+	struct ns_task *task = l3roamd_alloc ( sizeof ( struct ns_task ) ); //should this be aligned?
+
+	if (retries < 0 )
+		retries = -1;
+
+	task->interval = tv;
+	task->ctx = &l3ctx.ipmgr_ctx;
+	task->retries_left = retries;
+	task->force = force;
+	memcpy ( &task->address, dst, sizeof ( struct in6_addr ) );
+	return task;
+}
+
 struct ip_task *create_task ( struct in6_addr *dst )
 {
 	struct ip_task *task = l3roamd_alloc ( sizeof ( struct ip_task ) ); //should this be aligned?
@@ -80,7 +93,11 @@ taskqueue_t *schedule_purge_task ( struct in6_addr *destination, int timeout )
 /** This will seek an address by checking locally and if needed querying the network by scheduling a task */
 void ipmgr_seek_address ( ipmgr_ctx *ctx, struct in6_addr *addr )
 {
-	struct ip_task *ns_data = create_task ( addr );
+	struct timespec interval = {
+		.tv_sec = SEEK_INTERVAL,
+		.tv_nsec = 0,
+	};
+	struct ns_task *ns_data = create_ns_task ( addr, interval, -1, false);
 	post_task ( CTX ( taskqueue ), 0, 0, ipmgr_ns_task, free, ns_data );
 
 	// schedule an intercom-seek operation that in turn will only be executed if there is no local client known
@@ -156,11 +173,7 @@ static bool should_we_really_seek ( struct in6_addr *destination )
 	}
 
 	if ( clientmgr_is_known_address ( &l3ctx.clientmgr_ctx, destination, &client ) && client_is_active ( client ) ) {
-		printf ( "=================================================\n" );
-		printf ( "================= FAT WARNING ===================\n" );
-		printf ( "=================================================\n" );
-		printf ( "seek task was scheduled, there are packets to be delivered to the host: %s\n", print_ip ( destination ) );
-		printf ( "which is a known client. This should not happen. Flushing packets for this destination\n" );
+		log_error ( "ERROR: seek task was scheduled, there are packets to be delivered to the host: %s, which is a known client. This should never happen. Flushing packets for this destination\n", print_ip ( destination ) );
 		ipmgr_route_appeared ( &l3ctx.ipmgr_ctx, destination );
 
 		return false;
@@ -230,21 +243,26 @@ void ipmgr_purge_task ( void *d )
 
 void ipmgr_ns_task ( void *d )
 {
-	struct ip_task *data = d;
-	char str[INET6_ADDRSTRLEN];
+	struct ns_task *data = d;
 
-	if ( should_we_really_seek ( &data->address ) ) {
-		if ( l3ctx.clientif_set ) {
-			inet_ntop ( AF_INET6, &data->address, str, sizeof str );
-			printf ( "\x1b[36mLooking for %s locally\x1b[0m\n", str );
+	if ( ! l3ctx.clientif_set )
+		return;
 
-			if ( address_is_ipv4 ( &data->address ) )
-				arp_send_request ( &l3ctx.arp_ctx, &data->address );
-			else
-				icmp6_send_solicitation ( &l3ctx.icmp6_ctx, &data->address );
-		}
-		struct ip_task *ns_data = create_task ( &data->address );
-		post_task ( &l3ctx.taskqueue_ctx, SEEK_INTERVAL, 0, ipmgr_ns_task, free, ns_data );
+	if ( ( ! data->force ) && ( ! should_we_really_seek ( &data->address ) ) )
+		return;
+
+
+	log_error ( "\x1b[36mLooking for %s locally\x1b[0m\n", print_ip( &data->address ) );
+	log_debug ( "ns_task: force = %i\n", data->force);
+
+	if ( address_is_ipv4 ( &data->address ) )
+		arp_send_request ( &l3ctx.arp_ctx, &data->address );
+	else
+		icmp6_send_solicitation ( &l3ctx.icmp6_ctx, &data->address );
+
+	if ( !! data->retries_left ) {
+		struct ns_task *ns_data = create_ns_task ( &data->address, data->interval, data->retries_left -1, data->force );
+		post_task ( &l3ctx.taskqueue_ctx, data->interval.tv_sec, data->interval.tv_nsec, ipmgr_ns_task, free, ns_data );
 	}
 }
 
