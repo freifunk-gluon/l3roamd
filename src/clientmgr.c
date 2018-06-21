@@ -609,7 +609,7 @@ void clientmgr_notify_mac ( clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifind
 
 	struct client *client = get_or_create_client ( mac, ifindex );
 
-	if ( client_is_active ( client ) ) {
+	if ( client->claimed || client_is_active ( client ) ) {
 		log_debug ( "client[%s] was detected earlier, not re-adding\n", print_mac(client->mac));
 		return;
 	}
