@@ -162,14 +162,20 @@ static void handle_packet ( ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len
 	}
 }
 
-static bool should_we_really_seek ( struct in6_addr *destination )
+static bool should_we_really_seek ( struct in6_addr *destination, bool force)
 {
 	struct client *client = NULL;
 	struct unknown_address *e = find_entry ( &l3ctx.ipmgr_ctx, destination, NULL );
 	// if a route to this client appeared, the queue will be emptied -- no seek necessary
 	if ( !e ) {
-		log_debug ( "INFO: seek task was scheduled but no packets to be delivered to host: %s\n",  print_ip ( destination ) );
-		return false;
+		log_debug ( "seek task was scheduled but no packets to be delivered to host: %s\n",  print_ip ( destination ) );
+		if ( force  &&  ( ! clientmgr_is_known_address ( &l3ctx.clientmgr_ctx, destination, &client ) ) ) {
+			log_debug ( "seeking because we do not know this IP yet: %s\n", print_ip ( destination ) );
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 
 	if ( clientmgr_is_known_address ( &l3ctx.clientmgr_ctx, destination, &client ) && client_is_active ( client ) ) {
@@ -248,9 +254,8 @@ void ipmgr_ns_task ( void *d )
 	if ( ! l3ctx.clientif_set )
 		return;
 
-	if ( ( ! data->force ) && ( ! should_we_really_seek ( &data->address ) ) )
-		return;
-
+	if ( ! should_we_really_seek ( &data->address, data->force ) )
+		return
 
 	log_error ( "\x1b[36mLooking for %s locally\x1b[0m\n", print_ip( &data->address ) );
 	log_debug ( "ns_task: force = %i\n", data->force);
@@ -270,7 +275,7 @@ void seek_task ( void *d )
 {
 	struct ip_task *data = d;
 
-	if ( should_we_really_seek ( &data->address ) ) {
+	if ( should_we_really_seek ( &data->address, false) ) {
 		printf ( "\x1b[36mseeking on intercom for client with the address %s\x1b[0m\n", print_ip ( &data->address ) );
 
 		intercom_seek ( &l3ctx.intercom_ctx, ( const struct in6_addr* ) & ( data->address ) );

@@ -208,17 +208,17 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 				log_verbose("triggering local NS cycle after DAD for address %s\n",print_ip(&packet.sol.hdr.nd_ns_target));
 				struct ns_task *ns_data = create_ns_task ( &packet.sol.hdr.nd_ns_target, (struct timespec){.tv_sec=0, .tv_nsec=300000000,}, 15, true);
 				post_task ( CTX ( taskqueue ), 0, 0, ipmgr_ns_task, free, ns_data );
-				continue;
 			}
+			else {
+				if (l3ctx.debug) {
+					char str[INET6_ADDRSTRLEN];
+					inet_ntop(AF_INET6, &packet.hdr.ip6_src, str, INET6_ADDRSTRLEN);
+					log_debug("Received Neighbor Solicitation from %s [%s] for IP %s. Learning source-IP for client.\n", str, print_mac(mac), print_ip(&packet.sol.hdr.nd_ns_target));
+				}
 
-			if (l3ctx.debug) {
-				char str[INET6_ADDRSTRLEN];
-				inet_ntop(AF_INET6, &packet.hdr.ip6_src, str, INET6_ADDRSTRLEN);
-				log_debug("Received Neighbor Solicitation from %s [%s] for IP %s. Learning source-IP for client.\n", str, print_mac(mac), print_ip(&packet.sol.hdr.nd_ns_target));
+				clientmgr_notify_mac(CTX(clientmgr), mac, ctx->ifindex);
+				clientmgr_add_address(CTX(clientmgr), &packet.hdr.ip6_src, mac, ctx->ifindex);
 			}
-
-			clientmgr_notify_mac(CTX(clientmgr), mac, ctx->ifindex);
-			clientmgr_add_address(CTX(clientmgr), &packet.hdr.ip6_src, mac, ctx->ifindex);
 		}
 	}
 }
@@ -267,6 +267,8 @@ void icmp6_handle_in(icmp6_ctx *ctx, int fd) {
 			continue;
 
 		log_debug("Learning from Neighbour Advertisement that Client [%02x:%02x:%02x:%02x:%02x:%02x] is active on ip %s\n",  packet.hw_addr[0], packet.hw_addr[1], packet.hw_addr[2], packet.hw_addr[3], packet.hw_addr[4], packet.hw_addr[5], print_ip(&packet.hdr.nd_na_target));
+
+		// TODO: make sure to stop possibly previously started NS-cycles due to DAD,
 
 		clientmgr_add_address(CTX(clientmgr), &packet.hdr.nd_na_target, packet.hw_addr, ctx->ifindex);
 	}

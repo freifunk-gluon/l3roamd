@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <sys/timerfd.h>
 
+#include "util.h"
 #include "taskqueue.h"
 #include "error.h"
 #include "timespec.h"
@@ -100,8 +101,7 @@ void taskqueue_schedule(taskqueue_ctx *ctx) {
 }
 
 void taskqueue_run(taskqueue_ctx *ctx) {
-	if (l3ctx.debug)
-		printf("handling taskqueue event\n");
+	log_debug("handling taskqueue event\n");
 	unsigned long long nEvents;
 
 	struct timespec now;
