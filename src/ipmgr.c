@@ -255,7 +255,7 @@ void ipmgr_ns_task ( void *d )
 		return;
 
 	if ( ! should_we_really_seek ( &data->address, data->force ) )
-		return
+		return;
 
 	log_error ( "\x1b[36mLooking for %s locally\x1b[0m\n", print_ip( &data->address ) );
 	log_debug ( "ns_task: force = %i\n", data->force);
