@@ -260,13 +260,15 @@ void usage()
     puts ( "  -h|--help          this help\n" );
 
     puts ( "The socket will accept the following commands:" );
-    puts ( "get_clients          The daemon will reply with a json structure, currently providing client count." );
-    puts ( "get_prefixes         This return a list of all prefixes being handled by l3roamd." );
-    puts ( "add_prefix <prefix>  This will treat <prefix> as if it was added using -p" );
-    puts ( "del_prefix <prefix>  This will remove <prefix> from the list of client-prefixes and stop accepting queries for clients within that prefix." );
+    puts ( "get_clients              The daemon will reply with a json structure, currently providing client count." );
+    puts ( "get_prefixes             This return a list of all prefixes being handled by l3roamd." );
+    puts ( "add_meshif <interface>   Add <interface> to mesh interfaces. Does the same as -m" );
+    puts ( "del_meshif <interface>   Remove <interface> from mesh interfaces. Reverts add_meshif" );
+    puts ( "add_prefix <prefix>      This will treat <prefix> as if it was added using -p" );
+    puts ( "del_prefix <prefix>      This will remove <prefix> from the list of client-prefixes and stop accepting queries for clients within that prefix." );
     puts ( "add_address <addr> <mac> This will add the ipv6 address to the client represented by <mac>" );
     puts ( "del_address <addr> <mac> This will remove the ipv6 address from the client represented by <mac>" );
-    puts ( "probe <addr> <mac>   This will start a neighbour discovery for a neighbour <mac> with address <addr>" );
+    puts ( "probe <addr> <mac>       This will start a neighbour discovery for a neighbour <mac> with address <addr>" );
 }
 
 
@@ -309,6 +311,7 @@ int main ( int argc, char *argv[] )
     bool v4_initialized = false;
     bool a_initialized = false;
     bool p_initialized = false;
+    bool m_initialized = false;
     l3ctx.clientif_set = false;
     l3ctx.routemgr_ctx.nl_disabled = false;
     l3ctx.wifistations_ctx.nl80211_disabled = false;
@@ -335,6 +338,7 @@ int main ( int argc, char *argv[] )
         { "version",     0, NULL, 'V' }
     };
 
+    intercom_init ( &l3ctx.intercom_ctx );
     int c;
     while ( ( c = getopt_long ( argc, argv, "dhva:b:e:p:i:m:t:c:4:n:s:d:VD:P:", long_options, &option_index ) ) != -1 )
         switch ( c ) {
@@ -352,8 +356,12 @@ int main ( int argc, char *argv[] )
             usage();
             exit ( EXIT_SUCCESS );
         case 'a':
+	    if (a_initialized)
+		    exit_error( "-a must not be specified more than once");
+
             if ( inet_pton ( AF_INET6, optarg, &l3ctx.intercom_ctx.ip ) != 1 )
                 exit_error ( "Can not parse IP address" );
+	    intercom_init_unicast(&l3ctx.intercom_ctx);
             a_initialized=true;
             break;
         case 'c':
@@ -414,11 +422,8 @@ int main ( int argc, char *argv[] )
             }
             break;
         case 'm':
-            if ( if_nametoindex ( optarg ) ) {
-                intercom_add_interface ( &l3ctx.intercom_ctx, strdupa ( optarg ) );
-            } else {
-                fprintf ( stderr, "ignoring unknown mesh-interface %s\n", optarg );
-            }
+	    intercom_add_interface ( &l3ctx.intercom_ctx, strdupa ( optarg ) );
+	    m_initialized = true;
             break;
         case 't':
             l3ctx.clientmgr_ctx.export_table = atoi ( optarg );
@@ -466,8 +471,8 @@ int main ( int argc, char *argv[] )
         exit_error ( "specifying -a is mandatory" );
     if ( !p_initialized )
         exit_error ( "specifying -p is mandatory" );
-
-    intercom_init ( &l3ctx.intercom_ctx );
+    if ( !m_initialized )
+        exit_error ( "specifying -m is mandatory" );
 
     catch_sigterm();
 

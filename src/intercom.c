@@ -18,13 +18,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
+#include <string.h>
 
 #define INTERCOM_GROUP "ff02::5523"
 #define INTERCOM_MAX_RECENT 100
 
 void schedule_retries(struct intercom_task *data, int ms_timeout, void (*processor)(void *data)  );
 
-bool join_mcast(const int sock, const struct in6_addr addr, intercom_if *iface) {
+bool join_mcast(const int sock, const struct in6_addr addr, intercom_if_t *iface) {
 	struct ipv6_mreq mreq;
 
 	mreq.ipv6mr_multiaddr = addr;
@@ -54,7 +55,7 @@ void free_intercom_task(void *d) {
 
 void intercom_update_interfaces(intercom_ctx *ctx) {
 	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
-		intercom_if *iface = &VECTOR_INDEX(ctx->interfaces, i);
+		intercom_if_t *iface = &VECTOR_INDEX(ctx->interfaces, i);
 
 		iface->ifindex = if_nametoindex(iface->ifname);
 
@@ -62,35 +63,90 @@ void intercom_update_interfaces(intercom_ctx *ctx) {
 			continue;
 
 		iface->ok = join_mcast(VECTOR_INDEX(ctx->interfaces, i).mcast_recv_fd, ctx->groupaddr.sin6_addr, iface);
-		// TODO: do we have to re-bind?
 	}
 }
 
-bool intercom_has_ifname(intercom_ctx *ctx, char *ifname) {
-	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
-		intercom_if *iface = &VECTOR_INDEX(ctx->interfaces, i);
-
-		if (strcmp(ifname, iface->ifname) == 0)
-			return true;
-	}
-
-	return false;
+int intercomif_compare_by_name ( const struct intercom_if *a, const struct intercom_if *b )
+{
+	return strncmp ( a->ifname, b->ifname, IFNAMSIZ);
 }
 
-void intercom_add_interface(intercom_ctx *ctx, char *ifname) {
-	if (intercom_has_ifname(ctx, ifname))
-		return;
+intercom_if_t* intercom_has_ifname(intercom_ctx *ctx, const char *ifname, int *elementindex)
+{
+	intercom_if_v vec = *(intercom_if_v*)&ctx->interfaces;
+
+	struct intercom_if key = { };
+	key.ifname = strdupa(ifname);
+
+	struct intercom_if *ret = (struct intercom_if*)VECTOR_LSEARCH ( &key, vec, intercomif_compare_by_name );
+
+	if (ret) {
+		log_debug( "match on interface-vector for %s", ifname);
+
+		if ( ret != NULL && elementindex != NULL ) {
+			*elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( vec, 0 ) ) / sizeof ( intercom_if_t );
+			log_debug ( " on index %i", *elementindex );
+		}
+		log_debug("\n");
+	}
+
+	return ret;
+}
+
+bool intercom_add_interface(intercom_ctx *ctx, char *ifname)
+{
+	if (intercom_has_ifname(ctx, ifname, NULL))
+		return false;
 
 	int ifindex = if_nametoindex(ifname);
 
-	intercom_if iface = {
+	if (ifindex == 0) {
+                fprintf ( stderr, "ignoring unknown mesh-interface %s\n", ifname );
+		return false;
+	}
+
+	log_verbose("adding mesh interface %s\n", ifname);
+
+	intercom_if_t iface = {
 		.ok = false,
 		.ifname = ifname,
 		.ifindex = ifindex
 	};
 
-	VECTOR_ADD(ctx->interfaces, iface);
+	int fd = socket(PF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+	if (fd < 0)
+		exit_error("creating socket");
 
+	ctx->groupaddr.sin6_scope_id = ifindex;
+	if (bind(fd, (struct sockaddr *)&ctx->groupaddr, sizeof(ctx->groupaddr)) < 0) {
+		perror("bind to multicast-address failed");
+		exit(EXIT_FAILURE);
+	}
+
+	iface.mcast_recv_fd = fd;
+	log_debug("ASSIGNING fd: %i to mcast_recv_fd on interface %s\n", fd, ifname);
+
+	VECTOR_ADD(ctx->interfaces, iface);
+	intercom_update_interfaces(&l3ctx.intercom_ctx);
+
+	return true;
+}
+
+
+bool intercom_del_interface(intercom_ctx *ctx, char *ifname)
+{
+	int elementindex;
+	intercom_if_t *meshif = intercom_has_ifname(ctx, ifname, &elementindex);
+
+	if (! meshif)
+		return false;
+
+	close(meshif->mcast_recv_fd);
+
+	free(meshif->ifname);
+
+	VECTOR_DELETE(ctx->interfaces, elementindex);
+	return true;
 }
 
 void obtainll(const char *ifname, struct in6_addr *ret) {
@@ -121,35 +177,8 @@ end:
 	freeifaddrs(ifap);
 }
 
-void intercom_init(intercom_ctx *ctx) {
-
-	struct in6_addr mgroup_addr;
-	if (inet_pton(AF_INET6, INTERCOM_GROUP, &mgroup_addr) < 1) {
-		exit_errno("Could not convert intercom-group to network representation");
-	};
-
-	ctx->groupaddr = (struct sockaddr_in6) {
-		.sin6_family = AF_INET6,
-		.sin6_addr = mgroup_addr,
-		.sin6_port = htons(INTERCOM_PORT),
-	};
-
-	// bind sockets to receive multicast
-	for (int i=VECTOR_LEN(ctx->interfaces)-1; i>=0; i--) {
-		int fd = socket(PF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-		if (fd < 0)
-			exit_error("creating socket");
-
-		ctx->groupaddr.sin6_scope_id = VECTOR_INDEX(ctx->interfaces, i).ifindex;
-		if (bind(fd, (struct sockaddr *)&ctx->groupaddr, sizeof(ctx->groupaddr)) < 0) {
-			perror("bind to multicast-address failed");
-			exit(EXIT_FAILURE);
-		}
-
-		VECTOR_INDEX(ctx->interfaces, i).mcast_recv_fd = fd;
-		printf("ASSIGNING fd: %i to mcast_recv_fd on interface %s\n", fd, VECTOR_INDEX(ctx->interfaces, i).ifname);
-	}
-
+void intercom_init_unicast(intercom_ctx *ctx)
+{
 	struct sockaddr_in6 server_addr = {
 		.sin6_family = AF_INET6,
 		.sin6_port = htons(INTERCOM_PORT),
@@ -165,7 +194,21 @@ void intercom_init(intercom_ctx *ctx) {
 		exit(EXIT_FAILURE);
 	}
 
-	printf("ASSIGNING fd: %i to unicast_nodeip_fd\n", ctx->unicast_nodeip_fd);
+	log_verbose("ASSIGNING fd: %i to unicast_nodeip_fd\n", ctx->unicast_nodeip_fd);
+}
+
+void intercom_init(intercom_ctx *ctx)
+{
+	struct in6_addr mgroup_addr;
+	if (inet_pton(AF_INET6, INTERCOM_GROUP, &mgroup_addr) < 1) {
+		exit_errno("Could not convert intercom-group to network representation");
+	};
+
+	ctx->groupaddr = (struct sockaddr_in6) {
+		.sin6_family = AF_INET6,
+		.sin6_addr = mgroup_addr,
+		.sin6_port = htons(INTERCOM_PORT),
+	};
 
 	intercom_update_interfaces(ctx);
 }
@@ -268,8 +311,7 @@ bool intercom_send_packet_unicast(intercom_ctx *ctx, const struct in6_addr *reci
 
 void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len) {
 	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
-		intercom_if *iface = &VECTOR_INDEX(ctx->interfaces, i);
-		// int fd = VECTOR_INDEX(ctx->interfaces, i).mcast_send_fd ;
+		intercom_if_t *iface = &VECTOR_INDEX(ctx->interfaces, i);
 		int fd = ctx->unicast_nodeip_fd;
 
 		if (!iface->ok)
@@ -425,11 +467,13 @@ struct client *find_repeatable (void *v, client_t *k, int *elementindex )
 	// TODO: replace this with VECTOR_BSEARCH
 	struct client *ret = (struct client*)VECTOR_LSEARCH ( &key, vec, client_compare_by_mac );
 
-	log_debug( "match on vector for mac %s", print_mac( k->mac ));
+	if (ret != NULL) {
+		log_debug( "match on vector for mac %s", print_mac( k->mac ));
 
-	if ( ret != NULL && elementindex != NULL ) {
-		*elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( vec, 0 ) ) / sizeof ( struct unknown_address );
-		log_debug ( " on index %i", *elementindex );
+		if (elementindex != NULL ) {
+			*elementindex = ( ( void* ) ret - ( void* ) &VECTOR_INDEX ( vec, 0 ) ) / sizeof ( struct unknown_address );
+			log_debug ( " on index %i", *elementindex );
+		}
 	}
 
 	log_debug ( "\n" );

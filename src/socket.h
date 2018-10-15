@@ -12,6 +12,8 @@
 enum socket_command {
 	GET_CLIENTS =0,
 	PROBE,
+	ADD_MESHIF,
+	DEL_MESHIF,
 	ADD_PREFIX,
 	DEL_PREFIX,
 	GET_PREFIX,

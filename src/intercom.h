@@ -76,12 +76,14 @@ typedef struct __attribute__((__packed__)) {
 	uint8_t address[16];
 } intercom_packet_info_entry;
 
-typedef struct {
+typedef struct intercom_if {
 	char *ifname;
 	unsigned int ifindex;
 	int mcast_recv_fd;
 	bool ok;
-} intercom_if;
+} intercom_if_t;
+
+typedef  VECTOR(intercom_if_t) intercom_if_v;
 
 struct intercom_task {
 	uint16_t packet_len;
@@ -98,7 +100,7 @@ typedef struct {
 	struct sockaddr_in6 groupaddr;
 	struct l3ctx *l3ctx;
 	VECTOR(intercom_packet_hdr) recent_packets;
-	VECTOR(intercom_if) interfaces;
+	intercom_if_v interfaces;
 	client_v repeatable_claims;
 	client_v repeatable_infos;
 	int unicast_nodeip_fd;
@@ -111,9 +113,11 @@ typedef struct {
 void intercom_recently_seen_add(intercom_ctx *ctx, intercom_packet_hdr *hdr);
 void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len);
 void intercom_seek(intercom_ctx *ctx, const struct in6_addr *address);
+void intercom_init_unicast(intercom_ctx *ctx);
 void intercom_init(intercom_ctx *ctx);
 void intercom_handle_in(intercom_ctx *ctx, int fd);
-void intercom_add_interface(intercom_ctx *ctx, char *ifname);
+bool intercom_add_interface(intercom_ctx *ctx, char *ifname);
+bool intercom_del_interface(intercom_ctx *ctx, char *ifname);
 void intercom_update_interfaces(intercom_ctx *ctx);
 bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished);
 bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client);

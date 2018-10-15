@@ -76,6 +76,14 @@ bool parse_command(char *cmd, enum socket_command *scmd) {
         *scmd = GET_CLIENTS;
         return true;
     }
+    if (!strncmp(cmd, "del_meshif ", 11)) {
+        *scmd = DEL_MESHIF;
+        return true;
+    }
+    if (!strncmp(cmd, "add_meshif ", 11)) {
+        *scmd = ADD_MESHIF;
+        return true;
+    }
     if (!strncmp(cmd, "del_prefix ", 11)) {
         *scmd = DEL_PREFIX;
         return true;
@@ -166,8 +174,7 @@ void get_clients(struct json_object *obj) {
 }
 
 void socket_handle_in(socket_ctx *ctx) {
-    if (l3ctx.debug)
-        printf("handling socket event\n");
+    log_debug("handling socket event\n");
 
     int fd = accept(ctx->fd, NULL, NULL);
     char line[LINEBUFFER_SIZE];
@@ -196,6 +203,7 @@ void socket_handle_in(socket_ctx *ctx) {
     struct in6_addr address = {};
     char *str_address = NULL;
     char *str_mac = NULL;
+    char *str_meshif = NULL;
 
     switch (cmd) {
     case PROBE:
@@ -218,7 +226,6 @@ void socket_handle_in(socket_ctx *ctx) {
         }
         break;
     case ADD_ADDRESS:
-        ;
         str_address = strtok(&line[12], " ");
         str_mac = strtok(NULL, " ");
         sscanf(str_mac, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
@@ -237,8 +244,19 @@ void socket_handle_in(socket_ctx *ctx) {
                 dprintf(fd, "NOT OK");
             }
         break;
+    case ADD_MESHIF:
+	str_meshif = strndup(&line[11], IFNAMSIZ);
+	if (! intercom_add_interface ( &l3ctx.intercom_ctx, str_meshif ) ) {
+		free(str_meshif);
+		break;
+	}
+	break;
+    case DEL_MESHIF:
+	str_meshif = strndup(&line[11], IFNAMSIZ);
+	if (! intercom_del_interface ( &l3ctx.intercom_ctx, str_meshif ) )
+		free(str_meshif);
+	break;
     case DEL_ADDRESS:
-        ;
         str_address = strtok(&line[12], " ");
         str_mac = strtok(NULL, " ");
         sscanf(str_mac, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
