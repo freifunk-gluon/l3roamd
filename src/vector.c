@@ -78,7 +78,7 @@ void *_l3roamd_vector_insert(l3roamd_vector_desc_t *desc, void **data, void *ele
 
 	memmove(p+elemsize, p, (desc->length-pos-1)*elemsize);
 	memcpy(p, element, elemsize);
-    return(p);
+	return(p);
 }
 
 /**
