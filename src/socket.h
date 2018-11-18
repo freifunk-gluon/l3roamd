@@ -14,6 +14,7 @@ enum socket_command {
 	PROBE,
 	ADD_MESHIF,
 	DEL_MESHIF,
+	GET_MESHIFS,
 	ADD_PREFIX,
 	DEL_PREFIX,
 	GET_PREFIX,

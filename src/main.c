@@ -264,6 +264,7 @@ void usage()
     puts ( "get_prefixes             This return a list of all prefixes being handled by l3roamd." );
     puts ( "add_meshif <interface>   Add <interface> to mesh interfaces. Does the same as -m" );
     puts ( "del_meshif <interface>   Remove <interface> from mesh interfaces. Reverts add_meshif" );
+    puts ( "get_meshifs              Obtain a list of all current mesh interfaces" );
     puts ( "add_prefix <prefix>      This will treat <prefix> as if it was added using -p" );
     puts ( "del_prefix <prefix>      This will remove <prefix> from the list of client-prefixes and stop accepting queries for clients within that prefix." );
     puts ( "add_address <addr> <mac> This will add the ipv6 address to the client represented by <mac>" );

@@ -34,6 +34,7 @@
 #include "routemgr.h"
 #include "util.h"
 #include "clientmgr.h"
+#include "intercom.h"
 
 void socket_init(socket_ctx *ctx, char *path) {
     if (!path) {
@@ -72,43 +73,40 @@ void socket_init(socket_ctx *ctx, char *path) {
 }
 
 bool parse_command(char *cmd, enum socket_command *scmd) {
-    if (!strncmp(cmd, "get_clients", 11)) {
+    if (!strncmp(cmd, "get_clients", 11))
         *scmd = GET_CLIENTS;
-        return true;
-    }
-    if (!strncmp(cmd, "del_meshif ", 11)) {
+    else if (!strncmp(cmd, "del_meshif ", 11))
         *scmd = DEL_MESHIF;
-        return true;
-    }
-    if (!strncmp(cmd, "add_meshif ", 11)) {
+    else if (!strncmp(cmd, "get_meshifs", 11))
+        *scmd = GET_MESHIFS;
+    else if (!strncmp(cmd, "add_meshif ", 11))
         *scmd = ADD_MESHIF;
-        return true;
-    }
-    if (!strncmp(cmd, "del_prefix ", 11)) {
+    else if (!strncmp(cmd, "del_prefix ", 11))
         *scmd = DEL_PREFIX;
-        return true;
-    }
-    if (!strncmp(cmd, "add_address ", 12)) {
+    else if (!strncmp(cmd, "add_address ", 12))
         *scmd = ADD_ADDRESS;
-        return true;
-    }
-    if (!strncmp(cmd, "del_address ", 12)) {
+    else if (!strncmp(cmd, "del_address ", 12))
         *scmd = DEL_ADDRESS;
-        return true;
-    }
-    if (!strncmp(cmd, "add_prefix ", 11)) {
+    else if (!strncmp(cmd, "add_prefix ", 11))
         *scmd = ADD_PREFIX;
-        return true;
-    }
-    if (!strncmp(cmd, "probe ", 6)) {
+    else if (!strncmp(cmd, "probe ", 6))
         *scmd = PROBE;
-        return true;
-    }
-    if (!strncmp(cmd, "get_prefixes", 12)) {
+    else if (!strncmp(cmd, "get_prefixes", 12))
         *scmd = GET_PREFIX;
-        return true;
+    else
+        return false;
+
+    return true;
+}
+
+void socket_get_meshifs(struct json_object *obj) {
+    struct json_object *jmeshifs = json_object_new_array();
+
+    for (int i = 0; i<VECTOR_LEN(l3ctx.intercom_ctx.interfaces); i++) {
+        intercom_if_t *iface = &VECTOR_INDEX(l3ctx.intercom_ctx.interfaces, i);
+        json_object_array_add(jmeshifs, json_object_new_string(iface->ifname));
     }
-    return false;
+    json_object_object_add(obj, "mesh_interfaces", jmeshifs);
 }
 
 void socket_get_prefixes(struct json_object *obj) {
@@ -251,6 +249,10 @@ void socket_handle_in(socket_ctx *ctx) {
 		break;
 	}
 	break;
+    case GET_MESHIFS:
+        socket_get_meshifs(retval);
+        dprintf(fd, "%s", json_object_to_json_string(retval));
+        break;
     case DEL_MESHIF:
 	str_meshif = strndup(&line[11], IFNAMSIZ);
 	if (! intercom_del_interface ( &l3ctx.intercom_ctx, str_meshif ) )
