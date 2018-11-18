@@ -422,7 +422,7 @@ int main ( int argc, char *argv[] )
             }
             break;
         case 'm':
-	    intercom_add_interface ( &l3ctx.intercom_ctx, strdupa ( optarg ) );
+	    intercom_add_interface ( &l3ctx.intercom_ctx, strdup ( optarg ) );
 	    m_initialized = true;
             break;
         case 't':
