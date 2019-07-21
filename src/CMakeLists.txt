@@ -1,5 +1,6 @@
 ADD_DEFINITIONS(-D_GNU_SOURCE)
 
+
 list(APPEND CMAKE_REQUIRED_DEFINITIONS '-D_GNU_SOURCE')
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${L3ROAMD_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -21,8 +22,8 @@ target_link_libraries(l3roamd ${LIBNL_LIBRARIES} ${LIBNL_GENL_LIBRARIES} ${JSON_
 target_link_libraries(l3roamd-test ${LIBNL_LIBRARIES} ${LIBNL_GENL_LIBRARIES} ${JSON_C_LIBRARIES})
 
 #set_target_properties(l3roamd PROPERTIES COMPILE_FLAGS "-std=gnu11 -Wall -fsanitize=address" LINK_FLAGS " -fno-omit-frame-pointer -fsanitize=address -static-libasan")
-set_target_properties(l3roamd PROPERTIES COMPILE_FLAGS "-std=gnu11 -Wall" LINK_FLAGS "")
-set_target_properties(l3roamd-test PROPERTIES COMPILE_FLAGS "-std=gnu11 -Wall" LINK_FLAGS "")
+set( CMAKE_C_FLAGS "-std=gnu11 -Wall -Wcast-align -Wextra -Os " )
+
 
 install(TARGETS l3roamd RUNTIME DESTINATION bin)
 

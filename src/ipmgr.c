@@ -88,7 +88,7 @@ taskqueue_t *schedule_purge_task(struct in6_addr *destination, int timeout) {
 
 /** This will seek an address by checking locally and if needed querying the
  * network by scheduling a task */
-void ipmgr_seek_address(ipmgr_ctx *ctx, struct in6_addr *addr) {
+void ipmgr_seek_address(struct in6_addr *addr) {
 	struct timespec interval = {
 	    .tv_sec = SEEK_INTERVAL, .tv_nsec = 0,
 	};
@@ -151,7 +151,7 @@ static void handle_packet(ipmgr_ctx *ctx, uint8_t packet[], ssize_t packet_len) 
 	VECTOR_ADD(e->packets, p);
 
 	if (new_unknown_dst) {
-		ipmgr_seek_address(ctx, &dst);
+		ipmgr_seek_address(&dst);
 		e->check_task = schedule_purge_task(&dst, PACKET_TIMEOUT);
 	}
 }
@@ -350,7 +350,7 @@ void ipmgr_route_appeared(ipmgr_ctx *ctx, const struct in6_addr *destination) {
 		return;
 	}
 
-	for (int i = 0; i < VECTOR_LEN(e->packets); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(e->packets); i++) {
 		struct packet p = VECTOR_INDEX(e->packets, i);
 		VECTOR_ADD(ctx->output_queue, p);
 	}

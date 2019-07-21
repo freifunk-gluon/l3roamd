@@ -14,14 +14,19 @@
 
 int obtainrandom(void *buf, size_t buflen, unsigned int flags) {
 	int rc = 0;
-	while (rc != buflen) {
-		rc = (int)syscall(SYS_getrandom, buf, buflen, flags);
-		if (rc == -1) {
+	size_t fill = 0;
+
+	do {
+		rc = (int)syscall(SYS_getrandom, &buf + fill, buflen - fill, flags);
+		if (rc < 0 ) {
 			if (errno != ENOSYS) {
 				exit_error("syscall SYS_getrandom.");
 			}
 			perror("syscall SYS_getrandom failed. retrying");
+		} else {
+			fill += rc;
 		}
-	}
-	return rc;
+	} while (fill < buflen);
+
+	return fill;
 }

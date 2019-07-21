@@ -30,7 +30,9 @@
 
 #include <linux/nl80211.h>
 
-static int no_seq_check(struct nl_msg *msg, void *arg) { return NL_OK; }
+static int no_seq_check(__attribute__((__unused__)) struct nl_msg *msg, __attribute__((__unused__)) void *arg) {
+	return NL_OK;
+}
 
 void wifistations_handle_in(wifistations_ctx *ctx) { nl_recvmsgs(ctx->nl_sock, ctx->cb); }
 

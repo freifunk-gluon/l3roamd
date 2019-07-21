@@ -113,7 +113,7 @@ int test_icmp_dest_unreachable4() {
 	struct packet data = {};
 	data.len = 12;
 	uint8_t actualdata[data.len];
-	strncpy(actualdata, "xxxxxxxxxxxxx", data.len);
+	memcpy(actualdata, "xxxxxxxxxxxxx", data.len);
 	data.data = actualdata;
 	data.family = 4;
 
@@ -136,7 +136,7 @@ int all_tests() {
 	return 0;
 }
 
-int main(int argc, char **argv) {
+int main(__attribute__((__unused__)) int argc, __attribute__((__unused__)) char **argv) {
 	int result = all_tests();
 	if (result == 0)
 		printf("PASSED\n");

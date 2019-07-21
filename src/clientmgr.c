@@ -444,7 +444,7 @@ void client_ip_set_state(clientmgr_ctx *ctx, struct client *client, struct clien
 					break;
 				case IP_TENTATIVE:
 					ip->timestamp = now;
-					ipmgr_seek_address(&l3ctx.ipmgr_ctx, &ip->addr);
+					ipmgr_seek_address(&ip->addr);
 					break;
 			}
 			break;
@@ -460,7 +460,7 @@ void client_ip_set_state(clientmgr_ctx *ctx, struct client *client, struct clien
 					break;
 				case IP_TENTATIVE:
 					ip->timestamp = now;
-					ipmgr_seek_address(&l3ctx.ipmgr_ctx, &ip->addr);
+					ipmgr_seek_address(&ip->addr);
 					break;
 			}
 			break;
@@ -515,7 +515,7 @@ void clientmgr_remove_address(clientmgr_ctx *ctx, struct client *client, struct 
 
 	if (!client_is_active(client)) {
 		log_verbose("no active IP-addresses left in client. Deleting client. %s\n", print_mac(client->mac));
-		clientmgr_delete_client(&l3ctx.clientmgr_ctx, client->mac);
+		clientmgr_delete_client(ctx, client->mac);
 	}
 }
 
@@ -658,7 +658,7 @@ bool clientmgr_handle_claim(clientmgr_ctx *ctx, const struct in6_addr *sender, u
 	if (!client)
 		return false;
 
-	intercom_info(&l3ctx.intercom_ctx, sender, client, true);
+	intercom_info(&l3ctx.intercom_ctx, sender, client);
 
 	if (!old) {
 		log_verbose("Dropping client %s in response to claim from sender %s\n", print_mac(mac), print_ip(sender));
