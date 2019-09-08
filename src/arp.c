@@ -123,7 +123,7 @@ void arp_interface_changed(arp_ctx *ctx, int type, const struct ifinfomsg *msg) 
 		case RTM_NEWLINK:
 		case RTM_SETLINK:
 			log_verbose("arp interface changed - NEW or SET\n");
-			if (ctx->ifindex != msg->ifi_index) {
+			if (msg->ifi_index > 0 && ctx->ifindex != (size_t)msg->ifi_index) {
 				log_verbose("re-initializing arp interface %s\n", ifname);
 				arp_setup_interface(ctx);
 			}

@@ -65,7 +65,7 @@ bool add_prefix(void *prefixes, struct prefix _prefix) {
 */
 bool del_prefix(void *prefixes, struct prefix _prefix) {
 	VECTOR(struct prefix) *_prefixes = prefixes;
-	for (int i = 0; i < VECTOR_LEN(*_prefixes); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(*_prefixes); i++) {
 		if (!memcmp(&VECTOR_INDEX(*_prefixes, i), &_prefix, sizeof(_prefix))) {
 			VECTOR_DELETE(*_prefixes, i);
 			return true;

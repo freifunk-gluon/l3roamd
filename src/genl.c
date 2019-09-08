@@ -20,13 +20,13 @@
 
 #include "genl.h"
 
-static int error_handler(struct sockaddr_nl *nla, struct nlmsgerr *err, void *arg) {
+static int error_handler(__attribute__((__unused__)) struct sockaddr_nl *nla, struct nlmsgerr *err, void *arg) {
 	int *ret = arg;
 	*ret = err->error;
 	return NL_STOP;
 }
 
-static int ack_handler(struct nl_msg *msg, void *arg) {
+static int ack_handler(__attribute__((__unused__)) struct nl_msg *msg, void *arg) {
 	int *ret = arg;
 	*ret = 0;
 	return NL_STOP;

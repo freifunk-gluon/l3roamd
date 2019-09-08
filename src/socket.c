@@ -49,6 +49,7 @@ void socket_init(socket_ctx *ctx, char *path) {
 				    "unable to create status socket: the path "
 				    "`%s' already exists",
 				    path);
+				break;
 			default:
 				exit_errno("unable to create status socket");
 		}
@@ -92,7 +93,7 @@ bool parse_command(char *cmd, enum socket_command *scmd) {
 void socket_get_meshifs(struct json_object *obj) {
 	struct json_object *jmeshifs = json_object_new_array();
 
-	for (int i = 0; i < VECTOR_LEN(l3ctx.intercom_ctx.interfaces); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(l3ctx.intercom_ctx.interfaces); i++) {
 		intercom_if_t *iface = &VECTOR_INDEX(l3ctx.intercom_ctx.interfaces, i);
 		json_object_array_add(jmeshifs, json_object_new_string(iface->ifname));
 	}
@@ -106,7 +107,7 @@ void socket_get_prefixes(struct json_object *obj) {
 	inet_ntop(AF_INET6, &l3ctx.clientmgr_ctx.v4prefix.prefix, str_prefix, INET6_ADDRSTRLEN);
 	json_object_array_add(jprefixes, json_object_new_string(str_prefix));
 
-	for (int i = 0; i < VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i++) {
 		struct prefix *_prefix = &VECTOR_INDEX(l3ctx.clientmgr_ctx.prefixes, i);
 		inet_ntop(AF_INET6, &_prefix->prefix, str_prefix, INET6_ADDRSTRLEN);
 		json_object_array_add(jprefixes, json_object_new_string(str_prefix));
@@ -115,7 +116,7 @@ void socket_get_prefixes(struct json_object *obj) {
 }
 
 void get_clients(struct json_object *obj) {
-	int i = 0, j = 0;
+	size_t i = 0, j = 0;
 	struct json_object *jclients = json_object_new_object();
 
 	json_object_object_add(obj, "clients", json_object_new_int(VECTOR_LEN(l3ctx.clientmgr_ctx.clients)));

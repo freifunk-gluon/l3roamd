@@ -80,7 +80,7 @@ void free_intercom_task(void *d) {
 }
 
 void intercom_update_interfaces(intercom_ctx *ctx) {
-	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
 		intercom_if_t *iface = &VECTOR_INDEX(ctx->interfaces, i);
 
 		iface->ifindex = if_nametoindex(iface->ifname);
@@ -250,7 +250,7 @@ uint8_t assemble_basicinfo(uint8_t *packet, struct client *client) {
 	intercom_packet_info_entry *entry =
 	    (intercom_packet_info_entry *)((uint8_t *)(packet) + sizeof(client->mac) + 2);
 
-	for (int i = 0; i < VECTOR_LEN(client->addresses) && num_addresses < INFO_MAX; i++) {
+	for (size_t i = 0; i < VECTOR_LEN(client->addresses) && num_addresses < INFO_MAX; i++) {
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
 		if (ip_is_active(ip)) {
 			memcpy(&entry->address, ip->addr.s6_addr, sizeof(uint8_t) * 16);
@@ -302,7 +302,7 @@ bool intercom_send_packet_unicast(intercom_ctx *ctx, const struct in6_addr *reci
 }
 
 void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len) {
-	for (int i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(ctx->interfaces); i++) {
 		intercom_if_t *iface = &VECTOR_INDEX(ctx->interfaces, i);
 		int fd = ctx->unicast_nodeip_fd;
 
@@ -324,7 +324,7 @@ void intercom_send_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_len
 }
 
 bool intercom_recently_seen(intercom_ctx *ctx, intercom_packet_hdr *hdr) {
-	for (int i = 0; i < VECTOR_LEN(ctx->recent_packets); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(ctx->recent_packets); i++) {
 		intercom_packet_hdr *ref_hdr = &VECTOR_INDEX(ctx->recent_packets, i);
 
 		if (ref_hdr->nonce == hdr->nonce && ref_hdr->type == hdr->type)
@@ -351,7 +351,7 @@ int parse_mac(const uint8_t *packet, mac *claim) {
 	return packet[1];
 }
 
-int parse_plat(const uint8_t *packet, struct client *client) {
+int parse_plat(const uint8_t *packet) {
 	log_debug("parsing info packet plat\n");
 	memcpy(&l3ctx.clientmgr_ctx.platprefix, &packet[4], 16);
 	return packet[1];
@@ -380,7 +380,7 @@ int parse_basic(const uint8_t *packet, struct client *client) {
 }
 
 // handler returns true if packet should be forwarded
-bool intercom_handle_seek(intercom_ctx *ctx, intercom_packet_seek *packet, int packet_len) {
+bool intercom_handle_seek(intercom_packet_seek *packet, int packet_len) {
 	struct in6_addr address = {};
 	int currentoffset = sizeof(intercom_packet_info);
 	uint8_t *packetpointer;
@@ -528,7 +528,7 @@ bool intercom_handle_info(intercom_ctx *ctx, intercom_packet_info *packet, int p
 		log_debug("offset: %i %p %p\n", currentoffset, packet, packetpointer);
 		switch (type) {
 			case INFO_PLAT:
-				currentoffset += parse_plat(packetpointer, &client);
+				currentoffset += parse_plat(packetpointer);
 				break;
 			case INFO_BASIC:
 				currentoffset += parse_basic(packetpointer, &client);
@@ -560,7 +560,7 @@ void intercom_handle_packet(intercom_ctx *ctx, uint8_t *packet, ssize_t packet_l
 
 		intercom_recently_seen_add(ctx, hdr);
 		if (hdr->type == INTERCOM_SEEK)
-			forward = intercom_handle_seek(ctx, (intercom_packet_seek *)packet, packet_len);
+			forward = intercom_handle_seek((intercom_packet_seek *)packet, packet_len);
 
 		if (hdr->type == INTERCOM_CLAIM)
 			forward = intercom_handle_claim(ctx, (intercom_packet_claim *)packet, packet_len);
@@ -661,7 +661,7 @@ void info_retry_task(void *d) {
 	}
 }
 
-bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client, bool relinquished) {
+bool intercom_info(intercom_ctx *ctx, const struct in6_addr *recipient, struct client *client) {
 	int i;
 	if (find_repeatable(&ctx->repeatable_infos, client, &i))
 		return true;

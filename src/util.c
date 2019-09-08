@@ -67,7 +67,7 @@ const char *print_mac(const uint8_t *mac) {
 	return strbuffer.element[str_bufferoffset];
 }
 
-struct in_addr inline extractv4_v6(const struct in6_addr *src) {
+inline struct in_addr extractv4_v6(const struct in6_addr *src) {
 	struct in_addr tmp = {.s_addr = src->s6_addr[12] << 24 | src->s6_addr[13] << 16 | src->s6_addr[14] << 8 |
 					src->s6_addr[15]};
 	struct in_addr ip4;
@@ -75,7 +75,7 @@ struct in_addr inline extractv4_v6(const struct in6_addr *src) {
 	return ip4;
 }
 
-void inline mapv4_v6(const struct in_addr *src, struct in6_addr *dst) {
+inline void mapv4_v6(const struct in_addr *src, struct in6_addr *dst) {
 	memcpy(dst, &l3ctx.clientmgr_ctx.v4prefix, 12);
 	memcpy(&(dst->s6_addr)[12], src, 4);
 }
@@ -108,7 +108,7 @@ void log_verbose(const char *format, ...) {
 /** Check whether an IP address is contained in the IPv4 prefix or the empty
  * prefix.
   */
-bool inline address_is_ipv4(const struct in6_addr *address) {
+inline bool address_is_ipv4(const struct in6_addr *address) {
 	return prefix_contains(&l3ctx.clientmgr_ctx.v4prefix, address);
 }
 

@@ -39,7 +39,8 @@
 
 l3ctx_t l3ctx = {};
 
-void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+void sig_term_handler(__attribute__((__unused__)) int signum, __attribute__((__unused__)) siginfo_t *info,
+		      __attribute__((__unused__)) void *ptr) {
 	write(STDERR_FILENO, SIGTERM_MSG, sizeof(SIGTERM_MSG));
 	struct prefix _prefix = {};
 
@@ -145,7 +146,7 @@ void loop() {
 			add_fd(efd, l3ctx.wifistations_ctx.fd, EPOLLIN);
 	}
 
-	for (int i = VECTOR_LEN(l3ctx.intercom_ctx.interfaces) - 1; i >= 0; i--) {
+	for (size_t i = 0; i < VECTOR_LEN(l3ctx.intercom_ctx.interfaces); i++) {
 		add_fd(efd, VECTOR_INDEX(l3ctx.intercom_ctx.interfaces, i).mcast_recv_fd, EPOLLIN);
 	}
 
@@ -223,10 +224,10 @@ void loop() {
 				    amount);
 			} else if (l3ctx.icmp6_ctx.fd == events[i].data.fd) {
 				if (events[i].events & EPOLLIN)
-					icmp6_handle_in(&l3ctx.icmp6_ctx, events[i].data.fd);
+					icmp6_handle_in(&l3ctx.icmp6_ctx);
 			} else if (l3ctx.icmp6_ctx.nsfd == events[i].data.fd) {
 				if (events[i].events & EPOLLIN)
-					icmp6_handle_ns_in(&l3ctx.icmp6_ctx, events[i].data.fd);
+					icmp6_handle_ns_in(&l3ctx.icmp6_ctx);
 			} else if (l3ctx.arp_ctx.fd == events[i].data.fd) {
 				if (events[i].events & EPOLLIN)
 					arp_handle_in(&l3ctx.arp_ctx, events[i].data.fd);

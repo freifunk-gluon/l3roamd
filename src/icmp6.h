@@ -26,8 +26,8 @@ typedef struct {
 	uint8_t mac[ETH_ALEN];
 } icmp6_ctx;
 
-void icmp6_handle_in(icmp6_ctx *ctx, int fd);
-void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd);
+void icmp6_handle_in(icmp6_ctx *ctx);
+void icmp6_handle_ns_in(icmp6_ctx *ctx);
 void icmp6_send_solicitation(icmp6_ctx *ctx, const struct in6_addr *addr);
 void icmp6_init(icmp6_ctx *ctx);
 void icmp6_interface_changed(icmp6_ctx *ctx, int type,

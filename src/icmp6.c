@@ -172,7 +172,7 @@ struct __attribute__((__packed__)) adv_packet {
 	uint8_t hw_addr[ETH_ALEN];
 };
 
-void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
+void icmp6_handle_ns_in(icmp6_ctx *ctx) {
 	char cbuf[CMSG_SPACE(sizeof(int))];
 
 	struct __attribute__((__packed__)) {
@@ -237,7 +237,7 @@ void icmp6_handle_ns_in(icmp6_ctx *ctx, int fd) {
 	}
 }
 
-void icmp6_handle_in(icmp6_ctx *ctx, int fd) {
+void icmp6_handle_in(icmp6_ctx *ctx) {
 	if (ctx->ndp_disabled)
 		return;
 

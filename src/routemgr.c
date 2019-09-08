@@ -20,7 +20,7 @@
 
 static void rtnl_change_address(routemgr_ctx *ctx, struct in6_addr *address, int type, int flags);
 static void rtnl_handle_link(const struct nlmsghdr *nh);
-static int rtnl_addattr(struct nlmsghdr *n, int maxlen, int type, void *data, int datalen);
+static int rtnl_addattr(struct nlmsghdr *n, size_t maxlen, int type, void *data, int datalen);
 static void rtmgr_rtnl_talk(routemgr_ctx *ctx, struct nlmsghdr *req);
 
 int parse_rtattr_flags(struct rtattr *tb[], int max, struct rtattr *rta, int len, unsigned short flags) {
@@ -43,7 +43,7 @@ int parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len) {
 }
 
 void rtmgr_client_probe_addresses(struct client *client) {
-	for (int i = 0; i < VECTOR_LEN(client->addresses); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(client->addresses); i++) {
 		routemgr_probe_neighbor(&l3ctx.routemgr_ctx, client->ifindex, &VECTOR_INDEX(client->addresses, i).addr,
 					client->mac);
 	}
@@ -242,7 +242,7 @@ void rtnl_handle_link(const struct nlmsghdr *nh) {
 	interfaces_changed(nh->nlmsg_type, msg);
 }
 
-void handle_kernel_routes(routemgr_ctx *ctx, const struct nlmsghdr *nh) {
+void handle_kernel_routes(const struct nlmsghdr *nh) {
 	struct kernel_route route;
 	int len = nh->nlmsg_len;
 	struct rtmsg *rtm;
@@ -278,7 +278,7 @@ void rtnl_handle_msg(routemgr_ctx *ctx, const struct nlmsghdr *nh) {
 		case RTM_NEWROUTE:
 			//		case RTM_DELROUTE:
 			log_debug("handling netlink message for route change\n");
-			handle_kernel_routes(ctx, nh);
+			handle_kernel_routes(nh);
 			break;
 		case RTM_NEWNEIGH:
 		case RTM_DELNEIGH:
@@ -331,7 +331,7 @@ void routemgr_init(routemgr_ctx *ctx) {
 	if (bind(ctx->fd, (struct sockaddr *)&snl, sizeof(snl)) < 0)
 		exit_error("can't bind RTNL socket");
 
-	for (int i = 0; i < VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i++) {
+	for (size_t i = 0; i < VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i++) {
 		struct prefix *prefix = &(VECTOR_INDEX(l3ctx.clientmgr_ctx.prefixes, i));
 		log_verbose("Activating route for prefix %s/%i on device %s(%i) in main routing-table\n",
 			    print_ip(&prefix->prefix), prefix->plen, l3ctx.ipmgr_ctx.ifname,
@@ -457,7 +457,7 @@ void routemgr_handle_in(routemgr_ctx *ctx, int fd) {
 	}
 }
 
-int rtnl_addattr(struct nlmsghdr *n, int maxlen, int type, void *data, int datalen) {
+int rtnl_addattr(struct nlmsghdr *n, size_t maxlen, int type, void *data, int datalen) {
 	int len = RTA_LENGTH(datalen);
 	struct rtattr *rta;
 	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen)

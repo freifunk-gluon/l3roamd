@@ -52,7 +52,7 @@ bool ipmgr_init(ipmgr_ctx *ctx, char *tun_name, unsigned int mtu);
 void ipmgr_route_appeared(ipmgr_ctx *ctx, const struct in6_addr *destination);
 void ipmgr_handle_in(ipmgr_ctx *ctx, int fd);
 void ipmgr_handle_out(ipmgr_ctx *ctx, int fd);
-void ipmgr_seek_address(ipmgr_ctx *ctx, struct in6_addr *addr);
+void ipmgr_seek_address(struct in6_addr *addr);
 struct ns_task *create_ns_task(struct in6_addr *dst, struct timespec tv,
 			       int retries, bool force);
 void ipmgr_ns_task(void *d);
