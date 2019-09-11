@@ -455,8 +455,8 @@ void routemgr_handle_in(routemgr_ctx *ctx, int fd) {
 }
 
 
-int rtnl_addattr(struct nlmsghdr *n, int maxlen, int type, void *data, int datalen) {
-	int len = RTA_LENGTH(datalen);
+int rtnl_addattr(struct nlmsghdr *n, size_t maxlen, int type, void *data, int datalen) {
+	size_t len = RTA_LENGTH(datalen);
 	struct rtattr *rta;
 	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen)
 		return -1;

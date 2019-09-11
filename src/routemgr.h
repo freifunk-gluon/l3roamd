@@ -101,7 +101,7 @@ void rtnl_remove_address(routemgr_ctx *ctx, struct in6_addr *address);
 
 // some netlink functionality that will also be used by other parts. this means
 // we should move netlink functionality somewhere else.
-int rtnl_addattr(struct nlmsghdr *n, int maxlen, int type, void *data, int datalen);
+int rtnl_addattr(struct nlmsghdr *n, size_t maxlen, int type, void *data, int datalen);
 void rtmgr_rtnl_talk(int fd, struct nlmsghdr *req);
 void rtmgr_client_remove_address(struct in6_addr *dst_address);
 bool handle_kernel_routes(const struct nlmsghdr *nh, struct kernel_route *route);
