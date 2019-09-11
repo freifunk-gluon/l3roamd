@@ -42,12 +42,12 @@ l3ctx_t l3ctx = {};
 void sig_term_handler(__attribute__((__unused__)) int signum, __attribute__((__unused__)) siginfo_t *info,
 		      __attribute__((__unused__)) void *ptr) {
 	write(STDERR_FILENO, SIGTERM_MSG, sizeof(SIGTERM_MSG));
-	struct prefix _prefix = {};
 
-	for (int i = VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i > 0; i--) {
-		del_prefix(&l3ctx.clientmgr_ctx.prefixes, _prefix);
-		routemgr_remove_route(&l3ctx.routemgr_ctx, 254, (struct in6_addr *)(_prefix.prefix.s6_addr),
-				      _prefix.plen);
+	for (size_t i = VECTOR_LEN(l3ctx.clientmgr_ctx.prefixes); i > 0; i--) {
+		struct prefix *_prefix = &VECTOR_INDEX(l3ctx.clientmgr_ctx.prefixes, i);
+		routemgr_remove_route(&l3ctx.routemgr_ctx, 254, (struct in6_addr *)(_prefix->prefix.s6_addr),
+				      _prefix->plen);
+		del_prefix(&l3ctx.clientmgr_ctx.prefixes, *_prefix);
 	}
 	clientmgr_purge_clients(&l3ctx.clientmgr_ctx);
 	_exit(EXIT_SUCCESS);
@@ -383,6 +383,11 @@ int main(int argc, char *argv[]) {
 					{"no-ndp", 0, NULL, 'X'},
 					{"version", 0, NULL, 'V'}};
 
+	// clients have ll-addresses - watch those.
+	struct prefix _prefix = {};
+	parse_prefix(&_prefix, "fe80::/64");
+	add_prefix(&l3ctx.clientmgr_ctx.prefixes, _prefix);
+
 	intercom_init(&l3ctx.intercom_ctx);
 	int c;
 	while ((c = getopt_long(argc, argv, "dhva:b:e:p:i:m:t:c:4:n:s:d:VD:P:", long_options, &option_index)) != -1)
@@ -502,11 +507,6 @@ int main(int argc, char *argv[]) {
 			"0:0:0:0:0:ffff::/96\n");
 		v4_initialized = true;
 	}
-
-	// clients have ll-addresses too
-	struct prefix _prefix = {};
-	parse_prefix(&_prefix, "fe80::/64");
-	add_prefix(&l3ctx.clientmgr_ctx.prefixes, _prefix);
 
 	if (!a_initialized)
 		exit_error("specifying -a is mandatory");
