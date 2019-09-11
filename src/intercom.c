@@ -808,8 +808,6 @@ bool intercom_claim(intercom_ctx *ctx, const struct in6_addr *recipient, struct 
 		((intercom_packet_claim *)data->packet)->hdr.ttl = 1;
 	}
 
-	client->claimed = true;
-
 	data->check_task = post_task(&l3ctx.taskqueue_ctx, 0, 0, claim_retry_task, free_intercom_task, data);
 	return true;
 }
