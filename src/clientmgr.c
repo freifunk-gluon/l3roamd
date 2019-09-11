@@ -152,8 +152,7 @@ int bind_to_address(struct in6_addr *address) {
 /** Adds the special node client IP address.
 */
 void add_special_ip(clientmgr_ctx *ctx, struct client *client) {
-	if (client == NULL)  // this can happen if the client was removed before
-		// the claim cycle was finished
+	if (client == NULL)  // this can happen if the client was removed before the claim cycle was finished
 		return;
 
 	if (client->node_ip_initialized) {
@@ -424,8 +423,6 @@ const char *state_str(enum ip_state state) {
 
 /** Change state of an IP address. Trigger all side effects like resetting
   counters, timestamps and route changes.
-TODO: we really should update the neighbour-table here too instead of
-clientmgr_add_client et al.
 */
 void client_ip_set_state(clientmgr_ctx *ctx, struct client *client, struct client_ip *ip, enum ip_state state) {
 	struct timespec now;
@@ -532,20 +529,16 @@ void cancel_client_neigh_removal(struct client_ip *ip) {
 void clientmgr_add_address(clientmgr_ctx *ctx, const struct in6_addr *address, const uint8_t *mac,
 			   const unsigned int ifindex) {
 	if (!clientmgr_valid_address(ctx, address)) {
-		log_debug(
-		    "address is not within a client-prefix and not an "
-		    "ll-address. Not adding %s to client %s\n",
-		    print_ip(address), print_mac(mac));
+		log_debug("address is not within a client-prefix and not an ll-address. Not adding %s to client %s\n",
+			  print_ip(address), print_mac(mac));
 		return;
 	}
 
 	if (l3ctx.debug) {
 		char ifname[IFNAMSIZ];
 		if_indextoname(ifindex, ifname);
-		log_debug(
-		    "clientmgr_add_address: %s [%s] is running for interface "
-		    "%s(%i)\n",
-		    print_ip(address), print_mac(mac), ifname, ifindex);
+		log_debug("clientmgr_add_address: %s [%s] is running for interface %s(%i)\n", print_ip(address),
+			  print_mac(mac), ifname, ifindex);
 	}
 
 	struct client *client = get_or_create_client(mac, ifindex);
@@ -568,7 +561,12 @@ void clientmgr_add_address(clientmgr_ctx *ctx, const struct in6_addr *address, c
 
 	if (!client->claimed) {
 		struct in6_addr address = mac2ipv6(client->mac, &ctx->node_client_prefix);
-		intercom_claim(&l3ctx.intercom_ctx, &address, client);  // this will set the special_ip after claiming
+		if (has_host_route(&address))
+			intercom_claim(&l3ctx.intercom_ctx, &address, client);  // this will set the special_ip after claiming
+		else
+			add_special_ip(ctx, client);
+
+		client->claimed = true;
 	}
 }
 
@@ -594,8 +592,12 @@ void clientmgr_notify_mac(clientmgr_ctx *ctx, uint8_t *mac, unsigned int ifindex
 
 	struct in6_addr address = mac2ipv6(client->mac, &ctx->node_client_prefix);
 
-	if (!client->claimed)
+	if (!client->claimed && has_host_route(&address))
 		intercom_claim(&l3ctx.intercom_ctx, &address, client);
+	else
+		add_special_ip(ctx, client);
+
+	client->claimed = true;
 
 	for (int i = VECTOR_LEN(client->addresses) - 1; i >= 0; i--) {
 		struct client_ip *ip = &VECTOR_INDEX(client->addresses, i);
@@ -697,6 +699,77 @@ bool clientmgr_handle_info(clientmgr_ctx *ctx, struct client *foreign_client) {
 
 	log_verbose("Client information merged into local client %s\n", print_client(client));
 	return true;
+}
+
+static void query_route(int fd, const int ifindex, struct in6_addr *address, const int prefix_length) {
+	struct nlrtreq req = {
+		.nl = {
+			.nlmsg_type = RTM_GETROUTE,
+			.nlmsg_flags = NLM_F_REQUEST,
+			.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
+		},
+		.rt = {
+			.rtm_family = AF_INET6,
+			.rtm_dst_len = prefix_length,
+			.rtm_src_len = 0,
+			.rtm_tos = 0,
+			.rtm_protocol = RTPROT_UNSPEC,
+			.rtm_scope = RT_SCOPE_UNIVERSE,
+			.rtm_type = RTN_UNSPEC,
+			.rtm_table = RT_TABLE_UNSPEC,
+			.rtm_flags = RTM_F_LOOKUP_TABLE | 0x2000 /* fibmatch */
+		},
+	};
+
+	rtnl_addattr(&req.nl, sizeof(req), RTA_DST, (void *)address, sizeof(struct in6_addr));
+
+	if (ifindex > 0 )
+		rtnl_addattr(&req.nl, sizeof(req), RTA_OIF, (void *)&ifindex, sizeof(ifindex));
+
+	rtmgr_rtnl_talk(fd, (struct nlmsghdr *)&req);
+}
+
+bool has_host_route(struct in6_addr *addr) {
+	int nlfd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+	if (nlfd < 0) {
+		perror("can't open RTNL socket");
+		return NULL;
+	}
+	struct sockaddr_nl snl = {
+		.nl_family = AF_NETLINK, .nl_groups = RTMGRP_IPV6_ROUTE,
+	};
+
+	if (bind(nlfd, (struct sockaddr *)&snl, sizeof(snl)) < 0)
+		perror("can't bind RTNL socket");
+
+	query_route(nlfd, 0, addr, 128);
+
+	uint8_t readbuffer[8192];
+	int count = recv(nlfd, readbuffer, sizeof(readbuffer), 0);
+
+	struct nlmsghdr *nh;
+	struct kernel_route route;
+	bool ret = false;
+
+	nh = (struct nlmsghdr *)readbuffer;
+	if (NLMSG_OK(nh, count)) {
+		switch (nh->nlmsg_type) {
+			case NLMSG_DONE:
+				break;
+			case NLMSG_ERROR:
+				ret = false;
+				break;
+			default:
+				ret = false;
+				if (nh->nlmsg_type == RTM_NEWROUTE)
+					if (handle_kernel_routes(nh, &route))
+						ret = ( route.metric < KERNEL_INFINITY);
+				break;
+		}
+	}
+
+	close(nlfd);
+	return ret;
 }
 
 void clientmgr_init() {

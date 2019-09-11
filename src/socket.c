@@ -66,6 +66,8 @@ bool parse_command(char *cmd, enum socket_command *scmd) {
 		*scmd = GET_CLIENTS;
 	else if (!strncmp(cmd, "verbosity ", 10))
 		*scmd = SET_VERBOSITY;
+	else if (!strncmp(cmd, "has_route ", 10))
+		*scmd = HAS_ROUTE;
 	else if (!strncmp(cmd, "del_meshif ", 11))
 		*scmd = DEL_MESHIF;
 	else if (!strncmp(cmd, "get_meshifs", 11))
@@ -228,6 +230,12 @@ void socket_handle_in(socket_ctx *ctx) {
 				l3ctx.debug = true;
 			}
 
+			break;
+		case HAS_ROUTE: /* debugging use only */
+			str_address = strtok(&line[10], " ");
+			if (inet_pton(AF_INET6, str_address, &address) == 1) {
+					dprintf(fd, "found route %s/128: %s\n", str_address, has_host_route(&address)? "YES" : "NO");
+			}
 			break;
 		case ADD_ADDRESS:
 			str_address = strtok(&line[12], " ");

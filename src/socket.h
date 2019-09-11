@@ -27,6 +27,7 @@ enum socket_command {
 	GET_PREFIX,
 	ADD_ADDRESS,
 	DEL_ADDRESS,
+	HAS_ROUTE,
 	SET_VERBOSITY
 };
 
