@@ -317,12 +317,25 @@ to build and install the program.
 
 ## Usage
 
-tdb
+L3roamd must be running on every node where clients can attach and on 
+all exit-nodes. Use -a -p and -m to provide the address of the node, at 
+least one client-prefix and at least one mesh-interface for the service 
+to be useful. client-interface/bridges are optional.
+
+An example call for l3roamd would be:
+
+```
+ip a a fddd::1 dev lo
+l3roamd -a fddd::1 -p fddd:1::/64 -m mesh0 -b br-client
+```
+
+For further command line parameters, refert to the help that can be 
+called with l3roamd -h
 
 ## Contribute
 
-If you can improve this specifications (typos, better wording, restructering, …) or even new important aspects, feel free to open a pull request.
-Please prefix your commits with "README: $my message" and try to summarize the changes in the commit message even if the commit message turns out to be longer than the change. Say, if you change a singel word, write a message like
+If you can improve this specifications (typos, better wording, restructuring, …) or even new important aspects, feel free to open a pull request.
+Please prefix your commits with "README: $my message" and try to summarize the changes in the commit message even if the commit message turns out to be longer than the change. Say, if you change a single word, write a message like
 
     README: corrected singel to single
     
