@@ -22,6 +22,7 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <time.h>
@@ -147,6 +148,7 @@ bool intercom_add_interface(intercom_ctx *ctx, char *ifname) {
 
 	VECTOR_ADD(ctx->interfaces, iface);
 	intercom_update_interfaces(&l3ctx.intercom_ctx);
+	add_fd(l3ctx.efd, fd, EPOLLIN);
 
 	return true;
 }

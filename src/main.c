@@ -115,43 +115,30 @@ bool reconnect_fd(int fd) {
 }
 
 void loop() {
-	int efd;
 	int maxevents = 64;
 	struct epoll_event *events;
 
-	efd = epoll_create1(0);
-	if (efd == -1) {
-		perror("epoll_create");
-		abort();
-	}
-
-	l3ctx.efd = efd;
-
-	add_fd(efd, l3ctx.ipmgr_ctx.fd, EPOLLIN);
-	add_fd(efd, l3ctx.routemgr_ctx.fd, EPOLLIN);
-	add_fd(efd, l3ctx.icmp6_ctx.unreachfd6, EPOLLIN);
-	add_fd(efd, l3ctx.icmp6_ctx.unreachfd4, EPOLLIN);
-	add_fd(efd, l3ctx.intercom_ctx.unicast_nodeip_fd, EPOLLIN);
-	add_fd(efd, l3ctx.taskqueue_ctx.fd, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.ipmgr_ctx.fd, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.routemgr_ctx.fd, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.icmp6_ctx.unreachfd6, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.icmp6_ctx.unreachfd4, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.intercom_ctx.unicast_nodeip_fd, EPOLLIN);
+	add_fd(l3ctx.efd, l3ctx.taskqueue_ctx.fd, EPOLLIN);
 
 	if (l3ctx.clientif_set) {
 		log_verbose("adding icmp6-fd to epoll\n");
-		add_fd(efd, l3ctx.icmp6_ctx.fd, EPOLLIN);
-		add_fd(efd, l3ctx.icmp6_ctx.nsfd, EPOLLIN);
+		add_fd(l3ctx.efd, l3ctx.icmp6_ctx.fd, EPOLLIN);
+		add_fd(l3ctx.efd, l3ctx.icmp6_ctx.nsfd, EPOLLIN);
 
 		log_verbose("adding arp-fd to epoll\n");
-		add_fd(efd, l3ctx.arp_ctx.fd, EPOLLIN);
+		add_fd(l3ctx.efd, l3ctx.arp_ctx.fd, EPOLLIN);
 
 		if (l3ctx.wifistations_ctx.fd >= 0)
-			add_fd(efd, l3ctx.wifistations_ctx.fd, EPOLLIN);
-	}
-
-	for (size_t i = 0; i < VECTOR_LEN(l3ctx.intercom_ctx.interfaces); i++) {
-		add_fd(efd, VECTOR_INDEX(l3ctx.intercom_ctx.interfaces, i).mcast_recv_fd, EPOLLIN);
+			add_fd(l3ctx.efd, l3ctx.wifistations_ctx.fd, EPOLLIN);
 	}
 
 	if (l3ctx.socket_ctx.fd >= 0)
-		add_fd(efd, l3ctx.socket_ctx.fd, EPOLLIN);
+		add_fd(l3ctx.efd, l3ctx.socket_ctx.fd, EPOLLIN);
 
 	/* Buffer where events are returned */
 	events = l3roamd_alloc0_array(maxevents, sizeof(struct epoll_event));
@@ -159,7 +146,7 @@ void loop() {
 
 	/* The event loop */
 	while (1) {
-		int n = epoll_wait(efd, events, maxevents, -1);
+		int n = epoll_wait(l3ctx.efd, events, maxevents, -1);
 		for (int i = 0; i < n; i++) {
 			log_debug(
 			    "handling event on fd %i. taskqueue.fd: %i "
@@ -387,6 +374,12 @@ int main(int argc, char *argv[]) {
 	struct prefix _prefix = {};
 	parse_prefix(&_prefix, "fe80::/64");
 	add_prefix(&l3ctx.clientmgr_ctx.prefixes, _prefix);
+
+	l3ctx.efd = epoll_create1(0);
+	if (l3ctx.efd == -1) {
+		perror("epoll_create");
+		abort();
+	}
 
 	intercom_init(&l3ctx.intercom_ctx);
 	int c;
