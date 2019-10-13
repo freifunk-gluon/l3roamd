@@ -67,7 +67,6 @@ typedef struct {
 	device clientif;
 	device client_bridge;
 	bool nl_disabled;
-	uint8_t bridge_mac[ETH_ALEN];
 } routemgr_ctx;
 
 void handle_route(routemgr_ctx *ctx, struct kernel_route *route);

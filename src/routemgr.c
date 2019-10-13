@@ -202,7 +202,7 @@ void client_bridge_changed(const struct nlmsghdr *nh, const struct ifinfomsg *ms
 			return;
 		}
 
-		if (!memcmp(RTA_DATA(tb[IFLA_ADDRESS]), l3ctx.routemgr_ctx.bridge_mac, 6)) {
+		if (!memcmp(RTA_DATA(tb[IFLA_ADDRESS]), l3ctx.routemgr_ctx.client_bridge.mac, 6)) {
 			log_debug(
 			    "client_bridge_changed called, change detected BUT "
 			    "mac [%s] address is the mac of the bridge, not "
