@@ -34,43 +34,45 @@
 void schedule_retries(struct intercom_task *data, int ms_timeout, void (*processor)(void *data));
 
 bool join_mcast(const struct in6_addr addr, intercom_if_t *iface) {
-	struct ipv6_mreq mreq;
+	if (iface->ifindex) {
+		struct ipv6_mreq mreq;
 
-	mreq.ipv6mr_multiaddr = addr;
-	mreq.ipv6mr_interface = iface->ifindex;
+		mreq.ipv6mr_multiaddr = addr;
+		mreq.ipv6mr_interface = iface->ifindex;
 
-	if (mreq.ipv6mr_interface == 0)
-		goto error;
+		if (setsockopt(iface->mcast_recv_fd, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) == 0)
+			return true;
+		else if (errno == EADDRINUSE)
+			return true;
+		else {
+			log_error("Could not join multicast group on %s: ", iface->ifname);
+			perror("setsockopt");
+		}
+	} else {
+		log_verbose("Could not join multicast group on %s: Interface not ready", iface->ifname);
+	}
 
-	if (setsockopt(iface->mcast_recv_fd, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) == 0)
-		return true;
-	else if (errno == EADDRINUSE)
-		return true;
-
-error:
-	log_error("Could not join multicast group on %s: ", iface->ifname);
-	perror(NULL);
 	return false;
 }
 
 bool leave_mcast(const struct in6_addr addr, intercom_if_t *iface) {
-	struct ipv6_mreq mreq;
+	if (iface->ifindex) {
+		struct ipv6_mreq mreq;
 
-	mreq.ipv6mr_multiaddr = addr;
-	mreq.ipv6mr_interface = iface->ifindex;
+		mreq.ipv6mr_multiaddr = addr;
+		mreq.ipv6mr_interface = iface->ifindex;
 
-	if (mreq.ipv6mr_interface == 0)
-		goto error;
+		if (setsockopt(iface->mcast_recv_fd, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq, sizeof(mreq)) == 0)
+			return true;
 
-	if (setsockopt(iface->mcast_recv_fd, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq, sizeof(mreq)) == 0)
-		return true;
+		log_verbose("Could not leave multicast group on %s: ", iface->ifname);
+		perror(NULL);
+	} else {
+		log_verbose("Could not leave multicast group on %s: invalid ifindex. Interface down?", iface->ifname);
+	}
 
-error:
-	log_error("Could not leave multicast group on %s: ", iface->ifname);
-	perror(NULL);
 	return false;
 }
-
 
 void free_intercom_task(void *d) {
 	struct intercom_task *data = d;
@@ -85,9 +87,6 @@ void intercom_update_interfaces(intercom_ctx *ctx) {
 		intercom_if_t *iface = &VECTOR_INDEX(ctx->interfaces, i);
 
 		iface->ifindex = if_nametoindex(iface->ifname);
-
-		if (!iface->ifindex)
-			continue;
 
 		iface->ok = join_mcast(ctx->groupaddr.sin6_addr, iface);
 	}
