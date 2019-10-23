@@ -442,7 +442,6 @@ void routemgr_handle_in(routemgr_ctx *ctx, int fd) {
 				case NLMSG_DONE:
 					continue;
 				case NLMSG_ERROR:
-					perror("handling netlink error-message");
 					ne = NLMSG_DATA(nh);
 					if (ne->error <= 0)
 						continue;
