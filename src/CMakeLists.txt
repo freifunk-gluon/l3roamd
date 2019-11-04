@@ -22,7 +22,7 @@ target_link_libraries(l3roamd ${LIBNL_LIBRARIES} ${LIBNL_GENL_LIBRARIES} ${JSON_
 target_link_libraries(l3roamd-test ${LIBNL_LIBRARIES} ${LIBNL_GENL_LIBRARIES} ${JSON_C_LIBRARIES})
 
 #set_target_properties(l3roamd PROPERTIES COMPILE_FLAGS "-std=gnu11 -Wall -fsanitize=address" LINK_FLAGS " -fno-omit-frame-pointer -fsanitize=address -static-libasan")
-set( CMAKE_C_FLAGS "-std=gnu11 -Wall -Wcast-align -Wextra -Os " )
+set( CMAKE_C_FLAGS "-std=gnu11 -flto -Wall -Wcast-align -Wextra -Os " )
 
 
 install(TARGETS l3roamd RUNTIME DESTINATION bin)
