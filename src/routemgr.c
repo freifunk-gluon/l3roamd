@@ -418,7 +418,7 @@ int parse_kernel_route_rta(struct rtmsg *rtm, int len, struct kernel_route *rout
 void routemgr_handle_in(routemgr_ctx *ctx, int fd) {
 	log_debug("handling routemgr_in event ");
 	ssize_t count;
-	uint8_t readbuffer[8192];
+	struct nlmsghdr readbuffer[8192/sizeof(struct nlmsghdr)];
 
 	struct nlmsghdr *nh;
 	struct nlmsgerr *ne;
