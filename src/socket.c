@@ -171,7 +171,7 @@ void socket_handle_in(socket_ctx *ctx) {
 	// the fd is closed
 	while (fill < LINEBUFFER_SIZE) {
 		len = read(fd, &(line[fill]), 1);
-		if (line[fill] == '\n' || line[fill] == '\r') {
+		if (line[fill] == '\n' || line[fill] == '\r' || len == 0) {
 			line[fill] = '\0';
 			break;
 		}
