@@ -77,7 +77,7 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
 
     \hideinitializer
 */
-#define VECTOR_GETINDEX(v, elem) ({ (elem - v.data) / sizeof(*elem); })
+#define VECTOR_GETINDEX(v, elem) ({ (elem - v.data); })
 
 /**
    Returns a pointer to the vector elements of \e v
@@ -127,6 +127,7 @@ void _l3roamd_vector_delete(l3roamd_vector_desc_t *desc, void **data, size_t pos
    */
 #define VECTOR_INIT(v)                \
 	({                            \
+		v.data = NULL;        \
 		v.desc.length = 0;    \
 		v.desc.allocated = 0; \
 	})
