@@ -620,7 +620,12 @@ void rtmgr_rtnl_talk(int fd, struct nlmsghdr *req) {
 	struct sockaddr_nl nladdr = {.nl_family = AF_NETLINK};
 
 	struct iovec iov = {req, 0};
-	struct msghdr msg = {&nladdr, sizeof(nladdr), &iov, 1, NULL, 0, 0};
+	struct msghdr msg = {
+		.msg_name = &nladdr,
+		.msg_namelen = sizeof(nladdr),
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
 
 	iov.iov_len = req->nlmsg_len;
 
